@@ -1,0 +1,56 @@
+/* Self-hosted, free (SIL Open Font License) fonts — no external CDN, no tracking. */
+@font-face {
+  font-family: 'Anton';
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url('fonts/anton-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal; font-weight: 600; font-display: swap;
+  src: url('fonts/archivo-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('fonts/archivo-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal; font-weight: 800; font-display: swap;
+  src: url('fonts/archivo-latin-800-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal; font-weight: 900; font-display: swap;
+  src: url('fonts/archivo-latin-900-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal; font-weight: 500; font-display: swap;
+  src: url('fonts/plus-jakarta-sans-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal; font-weight: 600; font-display: swap;
+  src: url('fonts/plus-jakarta-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('fonts/plus-jakarta-sans-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal; font-weight: 800; font-display: swap;
+  src: url('fonts/plus-jakarta-sans-latin-800-normal.woff2') format('woff2');
+}
+
+/* ---- Selectable display fonts (all OFL) ---- */
+@font-face { font-family: 'Bebas Neue'; font-weight: 400; font-display: swap; src: url('fonts/bebas-neue-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Oswald'; font-weight: 500; font-display: swap; src: url('fonts/oswald-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Oswald'; font-weight: 600; font-display: swap; src: url('fonts/oswald-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Oswald'; font-weight: 700; font-display: swap; src: url('fonts/oswald-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Archivo Black'; font-weight: 400; font-display: swap; src: url('fonts/archivo-black-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Montserrat'; font-weight: 700; font-display: swap; src: url('fonts/montserrat-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Montserrat'; font-weight: 800; font-display: swap; src: url('fonts/montserrat-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Montserrat'; font-weight: 900; font-display: swap; src: url('fonts/montserrat-latin-900-normal.woff2') format('woff2'); }

@@ -1,0 +1,89 @@
+=== Slide ===
+layout: cover
+theme: dark
+align: bottom
+topik: Hook
+eyebrow: STOP DULU
+judul: Jangan pilih jurusan cuma karena **gengsi**
+sub: Karena yang menjalani kuliahnya nanti… ya kamu. Bukan mereka.
+
+=== Slide ===
+layout: list
+theme: dark
+topik: Realita
+judul: Orang lain cuma lihat kulitnya
+- 🏫 Nama universitas
+- 🎓 Nama jurusan
+- 📊 Ranking kampus
+- 💼 Gaji yang katanya gede
+
+=== Slide ===
+layout: list
+theme: light
+topik: Realita
+judul: Tapi kamu yang menjalaninya
+- 📚 Tumpukan tugas
+- 🧠 Materi kuliah tiap hari
+- ⏳ Bertahun-tahun belajar
+- 💼 Karier setelah lulus
+
+=== Slide ===
+layout: highlight
+theme: light
+topik: Populer ≠ Cocok
+eyebrow: REALITA
+judul: Jurusan **populer** belum tentu **cocok** buat kamu.
+sub: Tertarik sama bidangnya, betah cara belajarnya, dan mau kerja di situ — itu yang nentuin.
+
+=== Slide ===
+layout: highlight
+theme: dark
+topik: "Katanya…"
+eyebrow: JANGAN KEMAKAN "KATANYA"
+judul: "Katanya jurusan ini masa depannya bagus…"
+sub: Tapi yang bakal ngerjain tugas dan skripsian nanti — kamu. Bukan yang ngomong "katanya".
+
+=== Slide ===
+layout: highlight
+theme: light
+topik: Tanya Ini Dulu
+eyebrow: TANYA INI DULU
+judul: **"Apakah aku mau menjalani prosesnya?"**
+sub: Bukan cuma "aku mau jadi apa", tapi "aku bersedia belajar apa selama bertahun-tahun?"
+
+=== Slide ===
+layout: list
+theme: dark
+topik: 3 Hal Penting
+judul: 3 hal yang wajib dipikirin
+- ❤️ Minat :: apa yang bikin kamu penasaran?
+- 💪 Kemampuan :: apa yang jadi kekuatanmu?
+- 🎯 Tujuan :: hidup seperti apa yang mau kamu bangun?
+
+=== Slide ===
+layout: highlight
+theme: dark
+topik: Reframing
+eyebrow: GANTI PERTANYAANNYA
+judul: Jurusan **terbaik** ≠ jurusan **paling populer**
+❌ "Mana yang paling bergengsi?"
+✅ "Mana yang paling cocok sama aku & masa depanku?"
+
+=== Slide ===
+layout: table
+theme: dark
+topik: Bukti
+judul: Kampus paling berprestasi
+🎓 Universitas Gadjah Mada :: 669
+🏛️ ITS :: 666
+📗 Universitas Brawijaya :: 606
+🔵 Universitas Indonesia :: 410
+🌿 IPB University :: 300
+
+=== Slide ===
+layout: cta
+theme: dark
+topik: Closing
+judul: Bangun mimpimu, **#PastiBisa**
+sub: Kenali dirimu. Kenali targetmu. Siapkan strategimu.
+tombol: Save & share ke temanmu 👇

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pasti Pintar — Carousel Studio</title>
+<link rel="icon" href="logo/logo.png" />
+<link rel="stylesheet" href="fonts.css" />
+<link rel="stylesheet" href="stage.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body class="stage-scope">
+
+<header class="app-header">
+  <div class="brand">
+    <img src="logo/logo.png" alt="Pasti Pintar" />
+    <div>
+      <h1>Carousel Studio</h1>
+      <p>Bikin carousel modern buat IG/TikTok — pilih layout, isi, generate. Semua jalan di browser.</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" id="resetBtn">Reset Draft</button>
+    <button class="btn btn-primary" id="generateBtnTop">✨ Generate</button>
+  </div>
+</header>
+
+<main>
+
+  <section class="panel">
+    <h2>Import dari PDF / Teks</h2>
+    <p class="hint">Punya naskah? Drop file <b>.pdf</b>, <b>.txt</b>, atau <b>.md</b> — jumlah &amp; isi slide kebentuk otomatis.
+      <button class="link-btn inline" id="showExampleBtn">Lihat contoh format</button> ·
+      <a class="link-btn inline" href="contoh-brief.txt" download>Download contoh (.txt)</a></p>
+    <div class="dropzone" id="importDropzone">
+      <div class="placeholder" id="importIcon">📄</div>
+      <div class="info">
+        <strong>Drag &amp; drop file brief</strong>
+        <span id="importSub">.pdf / .txt / .md — klik buat pilih file</span>
+      </div>
+      <div class="actions"><span class="import-status" id="importStatus"></span></div>
+    </div>
+    <input type="file" accept=".pdf,.txt,.md,text/plain,text/markdown,application/pdf" id="importFileInput" style="display:none" />
+
+    <div class="example-box" id="exampleBox" style="display:none">
+      <div class="example-guide">
+        <strong>Cara bikin file buat di-upload</strong>
+        <ol>
+          <li>Tulis di aplikasi teks apa aja (Notes, Word, Google Docs).</li>
+          <li>Tiap slide dipisah baris <code>=== Slide ===</code>.</li>
+          <li>Isi field: <code>layout</code>, <code>theme</code>, <code>topik</code>, <code>judul</code>, <code>sub</code>. Poin diawali <code>-</code>.</li>
+          <li>Simpan sebagai <code>.txt</code>, atau <b>Save/Print as PDF</b> lalu drop ke sini.</li>
+          <li>Highlight kata pakai <code>**kata**</code>. Tabel: <code>Nama :: Nilai</code>.</li>
+        </ol>
+      </div>
+      <pre class="example-code" id="exampleCode">memuat contoh…</pre>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Pengaturan Global</h2>
+    <p class="hint">Background dipakai buat slide bertema <b>Foto</b>. Handle IG &amp; website muncul di footer tiap slide.</p>
+    <div class="settings-grid">
+      <div>
+        <div class="dropzone" id="bgDropzone">
+          <img class="thumb" id="bgThumb" style="display:none" />
+          <div class="placeholder" id="bgPlaceholder">🖼️</div>
+          <div class="info"><strong>Background global</strong><span>drag &amp; drop / klik — JPG/PNG</span></div>
+          <div class="actions"><button type="button" class="link-btn danger" id="bgRemoveBtn" style="display:none">Hapus</button></div>
+        </div>
+        <input type="file" accept="image/*" id="bgFileInput" style="display:none" />
+      </div>
+      <div class="settings-fields">
+        <label>Handle Instagram</label>
+        <input type="text" id="igInput" placeholder="pastipintar" />
+        <label>Website</label>
+        <input type="text" id="webInput" placeholder="pastipintar.id" />
+      </div>
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label>Font Judul <span style="font-weight:500;text-transform:none;letter-spacing:0">— semua gratis (Open Font License)</span></label>
+      <div class="chip-row" id="fontRow"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="slides-head">
+      <div>
+        <h2>Slide</h2>
+        <p class="hint">Tiap slide bisa beda layout, tema, warna, texture &amp; garis. Highlight pakai <code>**kata**</code>.</p>
+      </div>
+    </div>
+    <div class="slides-list" id="slidesList"></div>
+    <div class="add-slide-row">
+      <button class="btn btn-ghost" id="addSlideBtn">+ Tambah Slide</button>
+    </div>
+  </section>
+
+  <div class="action-bar">
+    <button class="btn btn-primary btn-lg" id="generateBtn">✨ Generate PNG</button>
+    <button class="btn btn-secondary btn-lg" id="downloadZipBtn" style="display:none">⬇ Semua PNG (ZIP)</button>
+    <button class="btn btn-dark btn-lg" id="downloadPptxBtn">📝 Download PPTX (editable di Canva)</button>
+  </div>
+  <p class="status-msg" id="statusMsg"></p>
+
+  <section class="panel" id="gallerySection" style="display:none">
+    <h2>Hasil PNG</h2>
+    <p class="hint">Klik gambar buat ukuran penuh, atau download satuan. Buat versi editable, pakai tombol PPTX.</p>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+</main>
+
+<!-- hidden full-size stage used for PNG export -->
+<div id="exportHost" aria-hidden="true" style="position:fixed; left:-99999px; top:0; width:1080px; height:1350px;">
+  <div class="stage" id="exportStage"></div>
+</div>
+
+<script src="stage.js"></script>
+<script src="vendor/html-to-image.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/pptxgen.bundle.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

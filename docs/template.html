@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<link rel="stylesheet" href="fonts.css" />
+<link rel="stylesheet" href="stage.css" />
+<style>
+  html, body { margin: 0; padding: 0; width: 1080px; height: 1350px; overflow: hidden; background: #101138; }
+</style>
+</head>
+<body class="stage-scope">
+  <div class="stage" id="stage" data-type="cover" data-theme="dark"></div>
+  <script src="stage.js"></script>
+  <script>
+    function paint(d) { window.renderStage(document.getElementById("stage"), d); }
+    if (window.__SLIDE_DATA__) paint(window.__SLIDE_DATA__);
+    window.addEventListener("message", function (e) {
+      if (e.data && e.data.type === "render") paint(e.data.data);
+    });
+  </script>
+</body>
+</html>
