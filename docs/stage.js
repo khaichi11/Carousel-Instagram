@@ -127,6 +127,24 @@
     stage.style.removeProperty("--mark-color");
     stage.style.removeProperty("--text-color");
     stage.style.removeProperty("--display-font");
+    // custom aspect ratio
+    var w = 1080, h = 1350;
+    if (d.ratio === "1:1") h = 1080;
+    else if (d.ratio === "3:4") h = 1440;
+    else if (d.ratio === "9:16") h = 1920;
+    stage.style.width = w + "px";
+    stage.style.height = h + "px";
+
+    // custom font injection
+    if (d.customFontUrl) {
+      var linkId = "custom-font-" + d.font.replace(/\s+/g, "-");
+      if (!document.getElementById(linkId)) {
+        var link = document.createElement("link");
+        link.id = linkId; link.rel = "stylesheet"; link.href = d.customFontUrl;
+        document.head.appendChild(link);
+      }
+    }
+
     if (d.markColor) stage.style.setProperty("--mark-color", d.markColor);
     if (d.textColor) { stage.style.setProperty("--text-color", d.textColor); stage.classList.add("has-text-color"); }
     if (d.font) stage.style.setProperty("--display-font", "'" + d.font + "'");
@@ -138,7 +156,20 @@
       '<div class="stage-foot"><div class="handles"></div></div>';
 
     var photo = stage.querySelector(".bg-photo");
-    if (theme === "photo" && d.bgImage) photo.style.backgroundImage = "url('" + String(d.bgImage).replace(/'/g, "\\'") + "')";
+    if (theme === "photo" && d.bgImage) {
+      photo.style.backgroundImage = "url('" + String(d.bgImage).replace(/'/g, "\\'") + "')";
+      photo.style.backgroundPosition = (d.bgX||50) + "% " + (d.bgY||50) + "%";
+      photo.style.backgroundSize = (d.bgZoom||100) + "%";
+    }
+    
+    var pattern = stage.querySelector(".bg-pattern");
+    if (d.pattern) {
+      pattern.style.transform = "translate(" + ((d.patternX||50)-50) + "%, " + ((d.patternY||50)-50) + "%) scale(" + ((d.patternScale||100)/100) + ")";
+    }
+    var grain = stage.querySelector(".grain");
+    if (d.texture) {
+      grain.style.transform = "translate(" + ((d.textureX||50)-50) + "%, " + ((d.textureY||50)-50) + "%) scale(" + ((d.textureScale||100)/100) + ")";
+    }
 
     stage.querySelector(".logo-chip img").src = d.logo || "";
     var counter = stage.querySelector(".counter");

@@ -1,17 +1,17 @@
 import { parseBrief } from "./import-brief.js";
-import { downloadPptx } from "./pptx-export.js";
+import { downloadPptx } from "./pptx-export.js?v=4";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
 /* ---------------- Option definitions ---------------- */
 const TYPES = [
-  { id: "cover", label: "Cover", emoji: "💥" },
-  { id: "highlight", label: "Highlight", emoji: "🖊️" },
-  { id: "list", label: "List", emoji: "📋" },
-  { id: "table", label: "Tabel", emoji: "🏆" },
-  { id: "compare", label: "Komparasi", emoji: "⚖️" },
-  { id: "meme", label: "Meme", emoji: "😂" },
-  { id: "cta", label: "CTA", emoji: "📣" },
+  { id: "cover", label: "Cover" },
+  { id: "highlight", label: "Highlight" },
+  { id: "list", label: "List" },
+  { id: "table", label: "Tabel" },
+  { id: "compare", label: "Komparasi" },
+  { id: "meme", label: "Meme" },
+  { id: "cta", label: "CTA" },
 ];
 const THEMES = [{ id: "dark", label: "Navy" }, { id: "light", label: "Terang" }, { id: "photo", label: "Foto" }];
 const ALIGNS = [{ id: "", label: "Auto" }, { id: "top", label: "Atas" }, { id: "center", label: "Tengah" }, { id: "bottom", label: "Bawah" }];
@@ -65,15 +65,15 @@ const TYPE_FIELDS = {
 
 /* ---------------- Default deck (Pasti Pintar brief, corrected) ---------------- */
 const DEFAULT_SLIDES = [
-  { type: "cover", theme: "dark", topic: "Hook", eyebrow: "STOP DULU ✋", title: "Jangan Pilih Jurusan Cuma Karena **Gengsi**", subtitle: "Karena yang menjalani kuliahnya nanti… ya kamu. Bukan mereka." },
-  { type: "compare", theme: "dark", topic: "Realita", title: "Yang Dilihat vs Yang Dijalani", colA: "Yang orang lain lihat", itemsA: "🏫 Nama universitas\n🎓 Nama jurusan\n📊 Ranking kampus\n💼 Gaji", colB: "Yang kamu jalani", itemsB: "📚 Tugas\n🧠 Materi kuliah\n⏳ Bertahun belajar\n💼 Karier nanti" },
+  { type: "cover", theme: "dark", topic: "Hook", eyebrow: "STOP DULU", title: "Jangan Pilih Jurusan Cuma Karena **Gengsi**", subtitle: "Karena yang menjalani kuliahnya nanti… ya kamu. Bukan mereka." },
+  { type: "compare", theme: "dark", topic: "Realita", title: "Yang Dilihat vs Yang Dijalani", colA: "Yang orang lain lihat", itemsA: "Nama universitas\nNama jurusan\nRanking kampus\nGaji", colB: "Yang kamu jalani", itemsB: "Tugas\nMateri kuliah\nBertahun belajar\nKarier nanti" },
   { type: "highlight", theme: "light", topic: "Populer ≠ Cocok", eyebrow: "REALITA", title: "Jurusan **populer** belum tentu **cocok** buat kamu.", subtitle: "Tertarik sama bidangnya, betah cara belajarnya, dan mau kerja di situ — itu yang nentuin." },
   { type: "highlight", theme: "dark", topic: '"Katanya…"', eyebrow: 'JANGAN KEMAKAN "KATANYA"', title: '"Katanya jurusan ini masa depannya bagus…"', subtitle: 'Tapi yang bakal ngerjain tugas dan skripsian — kamu. Bukan yang ngomong "katanya".' },
   { type: "highlight", theme: "light", topic: "Tanya Ini Dulu", eyebrow: "TANYA INI DULU", title: '**"Apakah aku mau menjalani prosesnya?"**', subtitle: 'Bukan cuma "aku mau jadi apa", tapi "aku bersedia belajar apa selama bertahun-tahun?"' },
-  { type: "list", theme: "dark", topic: "3 Hal Penting", title: "3 Hal yang Wajib Dipikirin", items: "❤️ Minat :: apa yang bikin kamu penasaran?\n💪 Kemampuan :: apa yang jadi kekuatanmu?\n🎯 Tujuan :: hidup seperti apa yang mau kamu bangun?" },
-  { type: "highlight", theme: "dark", topic: "Reframing", eyebrow: "GANTI PERTANYAANNYA", title: "Jurusan **terbaik** ≠ jurusan **paling populer**", subtitle: '❌ "Mana yang paling bergengsi?"\n✅ "Mana yang paling cocok sama aku & masa depanku?"' },
-  { type: "table", theme: "dark", topic: "Bukti", title: "Kampus Paling Berprestasi", items: "🎓 Universitas Gadjah Mada :: 669\n🏛️ ITS :: 666\n📗 Universitas Brawijaya :: 606\n🔵 Universitas Indonesia :: 410\n🌿 IPB University :: 300" },
-  { type: "list", theme: "light", topic: "Kenapa Penting", title: "Pilih yang Tepat, Bukan yang Keren", items: "🔥 Lebih termotivasi\n📈 Lebih konsisten\n🛡️ Lebih siap hadapi tantangan" },
+  { type: "list", theme: "dark", topic: "3 Hal Penting", title: "3 Hal yang Wajib Dipikirin", items: "Minat :: apa yang bikin kamu penasaran?\nKemampuan :: apa yang jadi kekuatanmu?\nTujuan :: hidup seperti apa yang mau kamu bangun?" },
+  { type: "highlight", theme: "dark", topic: "Reframing", eyebrow: "GANTI PERTANYAANNYA", title: "Jurusan **terbaik** ≠ jurusan **paling populer**", subtitle: '"Mana yang paling bergengsi?"\n"Mana yang paling cocok sama aku & masa depanku?"' },
+  { type: "table", theme: "dark", topic: "Bukti", title: "Kampus Paling Berprestasi", items: "Universitas Gadjah Mada :: 669\nITS :: 666\nUniversitas Brawijaya :: 606\nUniversitas Indonesia :: 410\nIPB University :: 300" },
+  { type: "list", theme: "light", topic: "Kenapa Penting", title: "Pilih yang Tepat, Bukan yang Keren", items: "Lebih termotivasi\nLebih konsisten\nLebih siap hadapi tantangan" },
   { type: "cta", theme: "dark", topic: "Closing", title: "Bangun Mimpimu, **#PastiBisa**", subtitle: "Kenali dirimu. Kenali targetmu. Siapkan strategimu.", button: "Save & share ke temanmu 👇" },
 ];
 
@@ -82,11 +82,12 @@ function freshSlide(base) {
   return Object.assign(
     { id: crypto.randomUUID(), type: "cover", theme: "dark", align: "", topic: "", eyebrow: "", title: "", subtitle: "", button: "",
       items: "", colA: "", itemsA: "", colB: "", itemsB: "", capTop: "", capBottom: "",
-      textColor: "", markColor: "", texture: "", pattern: "", image: null, bgImage: null, _send: null },
+      textColor: "", markColor: "", texture: "", pattern: "", image: null, bgImage: null, 
+      bgX: 50, bgY: 50, bgZoom: 100, textureX: 50, textureY: 50, textureScale: 100, patternX: 50, patternY: 50, patternScale: 100, _send: null },
     base || {}
   );
 }
-const state = { bgImage: null, settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton" }, slides: DEFAULT_SLIDES.map(freshSlide) };
+const state = { bgImage: null, settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5" }, slides: DEFAULT_SLIDES.map(freshSlide) };
 
 let LOGO_DATAURL = "logo/logo.png";
 
@@ -124,7 +125,10 @@ function slideData(slide, idx, logo) {
     capTop: slide.capTop, capBottom: slide.capBottom, image: slide.image,
     bgImage: slide.bgImage || state.bgImage || null,
     textColor: slide.textColor, markColor: slide.markColor, texture: slide.texture, pattern: slide.pattern,
-    font: state.settings.font,
+    bgX: slide.bgX, bgY: slide.bgY, bgZoom: slide.bgZoom, 
+    textureX: slide.textureX, textureY: slide.textureY, textureScale: slide.textureScale, 
+    patternX: slide.patternX, patternY: slide.patternY, patternScale: slide.patternScale,
+    font: state.settings.font, customFontUrl: state.settings.customFontUrl, ratio: state.settings.ratio,
     logo: logo || LOGO_DATAURL, index: idx + 1, total: state.slides.length,
     igHandle: state.settings.igHandle, website: state.settings.website,
   };
@@ -245,6 +249,34 @@ function buildImageDropzone(slide, key, onChange, subtitle) {
   return dz;
 }
 
+function buildTransformControls(slide, prefix, label) {
+  const wrap = document.createElement("div"); wrap.className = "transform-ctrls";
+  wrap.style.display = "flex"; wrap.style.gap = "8px"; wrap.style.marginTop = "4px"; wrap.style.fontSize = "12px";
+  
+  const addSlider = (key, text, min, max, def) => {
+    const div = document.createElement("div"); div.style.flex = "1";
+    div.innerHTML = `<div style="display:flex;justify-content:space-between;color:var(--ink-soft)"><span>${text}</span><span>${slide[prefix+key]||def}</span></div>
+    <input type="range" min="${min}" max="${max}" value="${slide[prefix+key]||def}" style="width:100%">`;
+    const input = div.querySelector("input"), valSpan = div.querySelectorAll("span")[1];
+    input.addEventListener("input", () => {
+      const val = parseInt(input.value);
+      slide[prefix+key] = val;
+      valSpan.textContent = val;
+      slide._send && slide._send();
+    });
+    wrap.appendChild(div);
+  };
+  
+  addSlider("X", "X", 0, 100, 50);
+  addSlider("Y", "Y", 0, 100, 50);
+  addSlider("Scale", "Size", 10, 300, 100);
+  
+  const container = document.createElement("div");
+  container.appendChild(document.createTextNode(label));
+  container.appendChild(wrap);
+  return container;
+}
+
 function buildCard(slide, idx) {
   const card = document.createElement("div"); card.className = "slide-card"; card.dataset.id = slide.id;
   const top = document.createElement("div"); top.className = "slide-card-top";
@@ -264,8 +296,17 @@ function buildCard(slide, idx) {
   col.appendChild(optRow);
 
   const styleRow = document.createElement("div"); styleRow.className = "opt-row";
-  styleRow.appendChild(labeled("Texture", chipRow(TEXTURES, slide.texture, (id) => { slide.texture = id; slide._send && slide._send(); })));
-  styleRow.appendChild(labeled("Garis / Pattern", chipRow(PATTERNS, slide.pattern, (id) => { slide.pattern = id; slide._send && slide._send(); })));
+  
+  const texWrap = document.createElement("div");
+  texWrap.appendChild(chipRow(TEXTURES, slide.texture, (id) => { slide.texture = id; slide._send && slide._send(); }));
+  texWrap.appendChild(buildTransformControls(slide, "texture", ""));
+  styleRow.appendChild(labeled("Texture", texWrap));
+  
+  const patWrap = document.createElement("div");
+  patWrap.appendChild(chipRow(PATTERNS, slide.pattern, (id) => { slide.pattern = id; slide._send && slide._send(); }));
+  patWrap.appendChild(buildTransformControls(slide, "pattern", ""));
+  styleRow.appendChild(labeled("Garis / Pattern", patWrap));
+  
   col.appendChild(styleRow);
 
   const colorRow = document.createElement("div"); colorRow.className = "opt-row";
@@ -286,7 +327,12 @@ function buildCard(slide, idx) {
     col.appendChild(labeled(f.label, inp, f.hint));
   });
 
-  if (slide.theme === "photo") col.appendChild(labeled("Background Slide Ini", buildImageDropzone(slide, "bgImage", () => slide._send && slide._send(), "nimpa background global"), "Opsional."));
+  if (slide.theme === "photo") {
+    const bgWrap = document.createElement("div");
+    bgWrap.appendChild(buildImageDropzone(slide, "bgImage", () => slide._send && slide._send(), "nimpa background global"));
+    bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
+    col.appendChild(labeled("Background Slide Ini", bgWrap, "Opsional."));
+  }
 
   const prev = document.createElement("div"); prev.className = "preview-col";
   const frameWrap = document.createElement("div"); frameWrap.className = "preview-frame-wrap";
@@ -315,12 +361,47 @@ function refreshAll() { state.slides.forEach((s) => s._send && s._send()); }
 
 /* ---------------- Font selector (global) ---------------- */
 const fontRow = document.getElementById("fontRow");
+const customFontInput = document.getElementById("customFontInput");
 FONTS.forEach((f) => {
   const b = document.createElement("button"); b.className = "chip sm" + (state.settings.font === f.id ? " active" : ""); b.textContent = f.label;
   b.style.fontFamily = "'" + f.id + "', sans-serif";
-  b.addEventListener("click", () => { state.settings.font = f.id; [...fontRow.children].forEach((c) => c.classList.remove("active")); b.classList.add("active"); refreshAll(); });
+  b.addEventListener("click", () => {
+    state.settings.font = f.id;
+    state.settings.customFontUrl = "";
+    customFontInput.value = "";
+    [...fontRow.children].forEach((c) => c.classList.remove("active"));
+    b.classList.add("active");
+    refreshAll();
+  });
   fontRow.appendChild(b);
 });
+customFontInput.addEventListener("input", () => {
+  const url = customFontInput.value.trim();
+  state.settings.customFontUrl = url;
+  if (url) {
+    [...fontRow.children].forEach((c) => c.classList.remove("active"));
+    const match = url.match(/family=([^:&]+)/);
+    if (match) {
+      state.settings.font = match[1].replace(/\+/g, ' ');
+    }
+  } else {
+    // revert to Anton if emptied
+    state.settings.font = "Anton";
+    fontRow.children[0].classList.add("active");
+  }
+  refreshAll();
+});
+
+const ratioRow = document.getElementById("ratioRow");
+ratioRow.querySelectorAll("button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    state.settings.ratio = btn.dataset.ratio;
+    [...ratioRow.children].forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    refreshAll();
+  });
+});
+
 
 /* ---------------- Add / reset ---------------- */
 document.getElementById("addSlideBtn").addEventListener("click", () => {
@@ -346,10 +427,14 @@ function waitImages(el) {
 }
 async function renderPng(data) {
   window.renderStage(exportStage, data);
+  const w = parseInt(exportStage.style.width) || 1080;
+  const h = parseInt(exportStage.style.height) || 1350;
+  exportStage.parentElement.style.width = w + "px";
+  exportStage.parentElement.style.height = h + "px";
   await waitImages(exportStage);
   await document.fonts.ready;
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  return await window.htmlToImage.toPng(exportStage, { width: 1080, height: 1350, pixelRatio: 1, cacheBust: true });
+  return await window.htmlToImage.toPng(exportStage, { width: w, height: h, pixelRatio: 1, cacheBust: true });
 }
 async function generatePng() {
   generateBtn.disabled = generateBtnTop.disabled = true;
@@ -422,72 +507,86 @@ function extractRuns(node, upper) {
 }
 const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.trow .name,.trow .val,.cmp-head,.cmp-tx,.meme-cap,.counter";
 const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head"];
+const SHAPE_SEL = ".card, .table-card, .text-card, .cmp-col, .trow, .meme-frame, .list-ic, .rank";
+
 function collectPptx(stage, markHex) {
   const sr = stage.getBoundingClientRect();
   const els = [];
+  const blocks = [];
+  const safeNum = (v, fb = 0) => Number.isFinite(v) ? v : fb;
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+  
+  // Collect text boxes
   stage.querySelectorAll(EDIT_SEL).forEach((node) => {
     const r = node.getBoundingClientRect();
     if (r.width < 3 || r.height < 3) return;
     const cs = getComputedStyle(node);
-
-    // Measure letter-spacing (CSS px) -> convert later in pptx-export
     const lsRaw = cs.letterSpacing;
     const letterSpacingPx = (lsRaw && lsRaw !== "normal") ? parseFloat(lsRaw) : 0;
-
-    // Extra padding on text box dimensions to prevent clipping in PPTX
-    // Display/statement fonts need more room due to text-transform + large size
     const isDisplay = node.classList.contains("display") || node.classList.contains("statement") || node.classList.contains("section-title");
     const isSmall = node.classList.contains("eyebrow") || node.classList.contains("pill-btn") || node.classList.contains("counter");
-    const padW = isDisplay ? 8 : isSmall ? 6 : 4;
-    const padH = isDisplay ? 8 : isSmall ? 4 : 4;
+    const padW = isDisplay ? 12 : isSmall ? 8 : 6;
+    const padH = isDisplay ? 12 : isSmall ? 6 : 6;
+    const elemMarkHex = (markHex || (isDisplay ? "F7B400" : "FFD65A")).replace("#", "");
 
     els.push({
-      x: r.left - sr.left, y: r.top - sr.top, w: r.width + padW, h: r.height + padH,
+      x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
+      w: safeNum(r.width + padW), h: safeNum(r.height + padH),
       runs: extractRuns(node, cs.textTransform === "uppercase"),
       font: cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim(),
-      size: parseFloat(cs.fontSize), weight: parseInt(cs.fontWeight) || 400,
+      size: clamp(safeNum(parseFloat(cs.fontSize), 18), 8, 220),
+      weight: parseInt(cs.fontWeight) || 400,
       color: rgbToHex(cs.color),
       align: cs.textAlign.indexOf("center") >= 0 ? "center" : (cs.textAlign.indexOf("right") >= 0 || cs.textAlign.indexOf("end") >= 0) ? "right" : "left",
       valign: MID_CLASSES.some((c) => node.classList.contains(c)) ? "middle" : "top",
-      lineh: (parseFloat(cs.lineHeight) / parseFloat(cs.fontSize)) || 1.15,
-      charSpacing: letterSpacingPx,
-      markText: contrastHex(markHex || (node.closest(".display") ? "F7B400" : "FFD65A")),
+      lineh: clamp(safeNum(parseFloat(cs.lineHeight) / parseFloat(cs.fontSize), 1.15), 0.8, 2.5),
+      charSpacing: clamp(safeNum(letterSpacingPx, 0), -2, 8),
+      markText: contrastHex(elemMarkHex), markFill: elemMarkHex,
     });
   });
-  const marks = [];
-  stage.querySelectorAll("mark").forEach((m) => {
-    // Use getClientRects() to handle multi-line marks that wrap across lines
-    const rects = m.getClientRects();
-    const disp = !!m.closest(".display");
-    const color = markHex || (disp ? "F7B400" : "FFD65A");
-    const radius = disp ? 8 : 6;
-    // Horizontal padding that CSS applies via padding on marks
-    const hPad = disp ? 4 : 3;
-    const vPad = disp ? 2 : 1;
-    for (let i = 0; i < rects.length; i++) {
-      const r = rects[i];
-      if (r.width < 3 || r.height < 3) continue;
-      marks.push({
-        x: r.left - sr.left - hPad, y: r.top - sr.top - vPad,
-        w: r.width + hPad * 2, h: r.height + vPad * 2,
-        color, radius,
-      });
+
+  // Collect background blocks/shapes
+  stage.querySelectorAll(SHAPE_SEL).forEach((node) => {
+    const r = node.getBoundingClientRect();
+    if (r.width < 3 || r.height < 3) return;
+    const cs = getComputedStyle(node);
+    let bgStr = cs.backgroundColor;
+    let fillHex = rgbToHex(bgStr);
+    let fillAlpha = 1;
+    const m = bgStr.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([^)]+)\)/);
+    if (m) fillAlpha = parseFloat(m[1]);
+    
+    // For transparent gradient backgrounds, we fallback to a solid color if possible, or just white with transparency.
+    if (fillAlpha === 0 && cs.backgroundImage !== "none") {
+       fillHex = "FFFFFF"; fillAlpha = 0.9;
     }
+
+    blocks.push({
+      x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
+      w: safeNum(r.width), h: safeNum(r.height),
+      fill: { color: fillHex, transparency: Math.round((1 - fillAlpha) * 100) },
+      roundness: parseFloat(cs.borderRadius) || 0
+    });
   });
-  return { els, marks };
+
+  return { els, blocks };
 }
 async function renderSlideForPptx(data) {
   window.renderStage(exportStage, data);
+  const w = parseInt(exportStage.style.width) || 1080;
+  const h = parseInt(exportStage.style.height) || 1350;
+  exportStage.parentElement.style.width = w + "px";
+  exportStage.parentElement.style.height = h + "px";
   await waitImages(exportStage);
   await document.fonts.ready;
   // Extra frame delay for layout to settle (especially for compare/list cards)
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
   const markHex = (data.markColor || "").replace("#", "") || null;
-  const { els, marks } = collectPptx(exportStage, markHex);
+  const { els, blocks } = collectPptx(exportStage, markHex);
   exportStage.classList.add("pptx-bg");
-  const bg = await window.htmlToImage.toPng(exportStage, { width: 1080, height: 1350, pixelRatio: 1, cacheBust: true });
+  const bg = await window.htmlToImage.toPng(exportStage, { width: w, height: h, pixelRatio: 1, cacheBust: true });
   exportStage.classList.remove("pptx-bg");
-  return { bg, els, marks };
+  return { bg, els, blocks, width: w, height: h };
 }
 downloadPptxBtn.addEventListener("click", async () => {
   downloadPptxBtn.disabled = true;
@@ -496,10 +595,18 @@ downloadPptxBtn.addEventListener("click", async () => {
     const specs = [];
     for (let i = 0; i < state.slides.length; i++) {
       statusMsg.textContent = `Bikin PPTX — slide ${i + 1}/${state.slides.length}…`;
-      specs.push(await renderSlideForPptx(slideData(state.slides[i], i)));
+      try {
+        specs.push(await renderSlideForPptx(slideData(state.slides[i], i)));
+      } catch (e) {
+        throw new Error(`Gagal di slide ${i + 1} (render): ${e.stack || e.message}`);
+      }
     }
     statusMsg.textContent = "Menyusun file PPTX…";
-    await downloadPptx(specs, "carousel-pastipintar.pptx");
+    try {
+      await downloadPptx(specs, "carousel-pastipintar.pptx");
+    } catch (e) {
+      throw new Error(`Gagal saat menyusun PPTX (PptxGenJS): ${e.stack || e.message}`);
+    }
     statusMsg.textContent = "PPTX selesai! Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint)."; statusMsg.className = "status-msg ok";
   } catch (err) { statusMsg.textContent = "Error PPTX: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
   finally { downloadPptxBtn.disabled = false; }

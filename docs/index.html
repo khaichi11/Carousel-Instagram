@@ -21,7 +21,7 @@
   </div>
   <div class="header-actions">
     <button class="btn btn-ghost" id="resetBtn">Reset Draft</button>
-    <button class="btn btn-primary" id="generateBtnTop">✨ Generate</button>
+    <button class="btn btn-primary" id="generateBtnTop">Generate</button>
   </div>
 </header>
 
@@ -76,10 +76,26 @@
         <label>Website</label>
         <input type="text" id="webInput" placeholder="pastipintar.id" />
       </div>
+      </div>
+    </div>
+    <div class="settings-grid" style="margin-top:16px">
+      <div class="field">
+        <label>Ukuran / Aspek Rasio</label>
+        <div class="chip-row" id="ratioRow">
+          <button class="chip sm active" data-ratio="4:5">4:5 (IG Portrait)</button>
+          <button class="chip sm" data-ratio="1:1">1:1 (IG Square)</button>
+          <button class="chip sm" data-ratio="9:16">9:16 (Story/TikTok)</button>
+          <button class="chip sm" data-ratio="3:4">3:4</button>
+        </div>
+      </div>
     </div>
     <div class="field" style="margin-top:16px">
       <label>Font Judul <span style="font-weight:500;text-transform:none;letter-spacing:0">— semua gratis (Open Font License)</span></label>
       <div class="chip-row" id="fontRow"></div>
+      <div style="margin-top:8px">
+        <label style="font-size:12px;color:var(--ink-soft)">Atau Paste Link Google Fonts:</label>
+        <input type="text" id="customFontInput" placeholder="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" style="width:100%;margin-top:4px" />
+      </div>
     </div>
   </section>
 
@@ -97,9 +113,9 @@
   </section>
 
   <div class="action-bar">
-    <button class="btn btn-primary btn-lg" id="generateBtn">✨ Generate PNG</button>
-    <button class="btn btn-secondary btn-lg" id="downloadZipBtn" style="display:none">⬇ Semua PNG (ZIP)</button>
-    <button class="btn btn-dark btn-lg" id="downloadPptxBtn">📝 Download PPTX (editable di Canva)</button>
+    <button class="btn btn-primary btn-lg" id="generateBtn">Generate PNG</button>
+    <button class="btn btn-secondary btn-lg" id="downloadZipBtn" style="display:none">Download ZIP</button>
+    <button class="btn btn-dark btn-lg" id="downloadPptxBtn">Download PPTX (Editable)</button>
   </div>
   <p class="status-msg" id="statusMsg"></p>
 
@@ -120,6 +136,6 @@
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=4"></script>
 </body>
 </html>
