@@ -170,6 +170,24 @@
 .stage .statement mark { --mk: var(--mark-color, var(--gold-soft)); padding: 0.06em 0.24em; border-radius: 6px; }
 .stage[data-theme="light"] .statement mark { color: var(--ink); }
 
+/* PPTX background mode: hide editable words + highlight fills, keep every decoration
+   (cards, chips, icons, pills, logo, footer, gradient, grain). Text is re-added as
+   real editable PPTX text boxes on top, highlights as PPTX shapes. */
+.stage.pptx-bg .eyebrow,
+.stage.pptx-bg .display,
+.stage.pptx-bg .statement,
+.stage.pptx-bg .subtitle,
+.stage.pptx-bg .pill-btn,
+.stage.pptx-bg .section-title,
+.stage.pptx-bg .list-txt,
+.stage.pptx-bg .trow .name,
+.stage.pptx-bg .trow .val,
+.stage.pptx-bg .cmp-head,
+.stage.pptx-bg .cmp-tx,
+.stage.pptx-bg .meme-cap,
+.stage.pptx-bg .counter { color: transparent !important; text-shadow: none !important; }
+.stage.pptx-bg mark { background: transparent !important; color: transparent !important; }
+
 /* optional per-slide text color override (only for text sitting on the background) */
 .stage.has-text-color .display,
 .stage.has-text-color .statement,

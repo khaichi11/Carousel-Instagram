@@ -382,14 +382,125 @@ downloadZipBtn.addEventListener("click", async () => {
   downloadBlob(await zip.generateAsync({ type: "blob" }), "carousel.zip");
 });
 
-/* ---------------- Export: PPTX ---------------- */
+/* ---------------- Export: PPTX (pixel-faithful + editable) ---------------- */
+function rgbToHex(rgb) {
+  const m = String(rgb).match(/[\d.]+/g);
+  if (!m) return "000000";
+  return m.slice(0, 3).map((v) => Math.round(+v).toString(16).padStart(2, "0")).join("");
+}
+function contrastHex(hex) {
+  const h = (hex || "").replace("#", "") || "F7B400";
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? "101138" : "FFFFFF";
+}
+function extractRuns(node, upper) {
+  const runs = [];
+  const push = (t, o) => { if (t) runs.push(Object.assign({ text: upper ? t.toUpperCase() : t }, o)); };
+  (function walk(n, mark, bold) {
+    n.childNodes.forEach((c) => {
+      if (c.nodeType === 3) push(c.textContent, { mark, bold });
+      else if (c.nodeType === 1) {
+        const tag = c.tagName.toLowerCase();
+        if (tag === "br") { if (runs.length) runs[runs.length - 1].br = true; }
+        else if (tag === "mark") walk(c, true, bold);
+        else if (c.classList && c.classList.contains("lead")) {
+          // Lead text in list items — capture per-run font size
+          const leadCs = getComputedStyle(c);
+          const prevLen = runs.length;
+          walk(c, mark, true);
+          // Tag runs generated inside .lead with their specific font size
+          for (let i = prevLen; i < runs.length; i++) {
+            runs[i].fontSize = parseFloat(leadCs.fontSize);
+          }
+          if (runs.length) runs[runs.length - 1].br = true;
+        }
+        else walk(c, mark, bold);
+      }
+    });
+  })(node, false, false);
+  return runs;
+}
+const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.trow .name,.trow .val,.cmp-head,.cmp-tx,.meme-cap,.counter";
+const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head"];
+function collectPptx(stage, markHex) {
+  const sr = stage.getBoundingClientRect();
+  const els = [];
+  stage.querySelectorAll(EDIT_SEL).forEach((node) => {
+    const r = node.getBoundingClientRect();
+    if (r.width < 3 || r.height < 3) return;
+    const cs = getComputedStyle(node);
+
+    // Measure letter-spacing (CSS px) -> convert later in pptx-export
+    const lsRaw = cs.letterSpacing;
+    const letterSpacingPx = (lsRaw && lsRaw !== "normal") ? parseFloat(lsRaw) : 0;
+
+    // Extra padding on text box dimensions to prevent clipping in PPTX
+    // Display/statement fonts need more room due to text-transform + large size
+    const isDisplay = node.classList.contains("display") || node.classList.contains("statement") || node.classList.contains("section-title");
+    const isSmall = node.classList.contains("eyebrow") || node.classList.contains("pill-btn") || node.classList.contains("counter");
+    const padW = isDisplay ? 8 : isSmall ? 6 : 4;
+    const padH = isDisplay ? 8 : isSmall ? 4 : 4;
+
+    els.push({
+      x: r.left - sr.left, y: r.top - sr.top, w: r.width + padW, h: r.height + padH,
+      runs: extractRuns(node, cs.textTransform === "uppercase"),
+      font: cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim(),
+      size: parseFloat(cs.fontSize), weight: parseInt(cs.fontWeight) || 400,
+      color: rgbToHex(cs.color),
+      align: cs.textAlign.indexOf("center") >= 0 ? "center" : (cs.textAlign.indexOf("right") >= 0 || cs.textAlign.indexOf("end") >= 0) ? "right" : "left",
+      valign: MID_CLASSES.some((c) => node.classList.contains(c)) ? "middle" : "top",
+      lineh: (parseFloat(cs.lineHeight) / parseFloat(cs.fontSize)) || 1.15,
+      charSpacing: letterSpacingPx,
+      markText: contrastHex(markHex || (node.closest(".display") ? "F7B400" : "FFD65A")),
+    });
+  });
+  const marks = [];
+  stage.querySelectorAll("mark").forEach((m) => {
+    // Use getClientRects() to handle multi-line marks that wrap across lines
+    const rects = m.getClientRects();
+    const disp = !!m.closest(".display");
+    const color = markHex || (disp ? "F7B400" : "FFD65A");
+    const radius = disp ? 8 : 6;
+    // Horizontal padding that CSS applies via padding on marks
+    const hPad = disp ? 4 : 3;
+    const vPad = disp ? 2 : 1;
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i];
+      if (r.width < 3 || r.height < 3) continue;
+      marks.push({
+        x: r.left - sr.left - hPad, y: r.top - sr.top - vPad,
+        w: r.width + hPad * 2, h: r.height + vPad * 2,
+        color, radius,
+      });
+    }
+  });
+  return { els, marks };
+}
+async function renderSlideForPptx(data) {
+  window.renderStage(exportStage, data);
+  await waitImages(exportStage);
+  await document.fonts.ready;
+  // Extra frame delay for layout to settle (especially for compare/list cards)
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const markHex = (data.markColor || "").replace("#", "") || null;
+  const { els, marks } = collectPptx(exportStage, markHex);
+  exportStage.classList.add("pptx-bg");
+  const bg = await window.htmlToImage.toPng(exportStage, { width: 1080, height: 1350, pixelRatio: 1, cacheBust: true });
+  exportStage.classList.remove("pptx-bg");
+  return { bg, els, marks };
+}
 downloadPptxBtn.addEventListener("click", async () => {
   downloadPptxBtn.disabled = true;
-  statusMsg.className = "status-msg"; statusMsg.textContent = "Bikin file PPTX…";
+  statusMsg.className = "status-msg";
   try {
-    const slides = state.slides.map((s) => ({ ...s, bgImage: s.bgImage || state.bgImage || null, font: state.settings.font }));
-    await downloadPptx(slides, state.settings, LOGO_DATAURL, "carousel-pastipintar.pptx");
-    statusMsg.textContent = "PPTX selesai! Buka di PowerPoint atau upload ke Canva (semua elemen editable)."; statusMsg.className = "status-msg ok";
+    const specs = [];
+    for (let i = 0; i < state.slides.length; i++) {
+      statusMsg.textContent = `Bikin PPTX — slide ${i + 1}/${state.slides.length}…`;
+      specs.push(await renderSlideForPptx(slideData(state.slides[i], i)));
+    }
+    statusMsg.textContent = "Menyusun file PPTX…";
+    await downloadPptx(specs, "carousel-pastipintar.pptx");
+    statusMsg.textContent = "PPTX selesai! Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint)."; statusMsg.className = "status-msg ok";
   } catch (err) { statusMsg.textContent = "Error PPTX: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
   finally { downloadPptxBtn.disabled = false; }
 });
