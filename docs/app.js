@@ -1,5 +1,5 @@
 import { parseBrief } from "./import-brief.js";
-import { downloadPptx } from "./pptx-export.js?v=7";
+import { downloadPptx } from "./pptx-export.js?v=8";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -707,12 +707,12 @@ function extractRuns(node, upper) {
   return runs;
 }
 
-// Every text element → its own editable text box (incl. badge/rank numbers).
-const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.list-ic,.trow .name,.trow .val,.rank,.cmp-head,.cmp-tx,.meme-cap,.img-caption,.counter";
-const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head", "list-ic", "rank"];
-const CENTER_CLASSES = ["list-ic", "rank", "meme-cap", "counter", "pill-btn", "eyebrow"];
-// Cards/boxes/badges/image-frames → editable shapes.
-const SHAPE_SEL = ".card, .table-card, .text-card, .cmp-col, .trow, .meme-frame, .list-ic, .rank";
+// Every text element → its own editable text box (incl. footer handles + badge/rank text).
+const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.list-ic,.trow .name,.trow .val,.rank,.cmp-head,.cmp-tx,.meme-cap,.img-caption,.counter,.handles .h,.handles .ic";
+const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head", "list-ic", "rank", "ic", "h"];
+const CENTER_CLASSES = ["list-ic", "rank", "meme-cap", "counter", "pill-btn", "eyebrow", "ic"];
+// Cards/boxes/badges/pills/image-frames/logo chip → editable shapes.
+const SHAPE_SEL = ".card, .table-card, .text-card, .cmp-col, .trow, .meme-frame, .list-ic, .rank, .eyebrow, .pill-btn, .counter, .trow .val, .cmp-head, .handles .ic, .logo-chip";
 
 function collectPptx(stage, markHex, data) {
   const sr = stage.getBoundingClientRect();
@@ -777,6 +777,8 @@ function collectPptx(stage, markHex, data) {
       else { fillHex = "FFFFFF"; fillAlpha = 0.9; }
     }
 
+    if (fillAlpha <= 0 && (!cs.backgroundImage || cs.backgroundImage === "none")) return;
+
     blocks.push({
       x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
       w: safeNum(r.width), h: safeNum(r.height),
@@ -792,15 +794,20 @@ function collectPptx(stage, markHex, data) {
   stage.querySelectorAll("mark").forEach((mk) => {
     const isDisplay = !!mk.closest(".display, .statement, .section-title");
     const fill = (markHex || (isDisplay ? "F7B400" : "FFD65A")).replace("#", "");
+    const mkCs = getComputedStyle(mk);
+    const mkRadius = parseFloat(mkCs.borderRadius) || (isDisplay ? 8 : 5);
+    const useBand = !mk.closest(".display");
     const rects = mk.getClientRects();
     for (let i = 0; i < rects.length; i++) {
       const r = rects[i];
       if (r.width < 3 || r.height < 3) continue;
+      const insetY = useBand ? r.height * 0.14 : 0;
+      const hh = useBand ? Math.max(2, r.height * 0.72) : r.height;
       blocks.push({
-        x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
-        w: safeNum(r.width), h: safeNum(r.height),
+        x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top + insetY),
+        w: safeNum(r.width), h: safeNum(hh),
         fill: { color: fill, transparency: 0 },
-        roundness: isDisplay ? 8 : 5
+        roundness: mkRadius
       });
     }
   });
@@ -826,6 +833,17 @@ function collectPptx(stage, markHex, data) {
     dw *= s; dh *= s;
     const cx = ix + iw / 2 + tx, cy = iy + ih / 2 + ty;
     images.push({ src: node.src, x: safeNum(cx - dw / 2), y: safeNum(cy - dh / 2), w: safeNum(dw), h: safeNum(dh) });
+  });
+
+  // Logo stays a separate editable image instead of getting baked into background.
+  stage.querySelectorAll(".logo-chip img").forEach((node) => {
+    const r = node.getBoundingClientRect();
+    if (r.width < 3 || r.height < 3 || !node.src) return;
+    images.push({
+      src: node.src,
+      x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
+      w: safeNum(r.width), h: safeNum(r.height)
+    });
   });
 
   return { els, blocks, images };

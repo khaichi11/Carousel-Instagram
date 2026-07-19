@@ -224,12 +224,20 @@
 .stage.pptx-bg .trow,
 .stage.pptx-bg .meme-frame,
 .stage.pptx-bg .list-ic,
-.stage.pptx-bg .rank {
+.stage.pptx-bg .rank,
+.stage.pptx-bg .eyebrow,
+.stage.pptx-bg .pill-btn,
+.stage.pptx-bg .counter,
+.stage.pptx-bg .trow .val,
+.stage.pptx-bg .cmp-head,
+.stage.pptx-bg .handles .ic,
+.stage.pptx-bg .logo-chip {
   background: transparent !important;
   box-shadow: none !important;
   border-color: transparent !important;
 }
 .stage.pptx-bg .meme-frame img { opacity: 0 !important; }
+.stage.pptx-bg .logo-chip img { opacity: 0 !important; }
 
 /* optional per-slide text color override (only for text sitting on the background) */
 .stage.has-text-color .display,
