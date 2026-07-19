@@ -241,6 +241,15 @@
     var wrap = body.firstElementChild;
     if (!wrap) return;
     wrap.style.transform = "";
+    // Equal-height compare headers: when one title wraps to two lines, stretch the
+    // other to match so the yellow and grey header fields share the same dimension.
+    var heads = stage.querySelectorAll(".cmp-head");
+    if (heads.length > 1) {
+      var maxH = 0, i;
+      for (i = 0; i < heads.length; i++) heads[i].style.minHeight = "";
+      for (i = 0; i < heads.length; i++) maxH = Math.max(maxH, heads[i].getBoundingClientRect().height);
+      for (i = 0; i < heads.length; i++) heads[i].style.minHeight = maxH + "px";
+    }
     var avail = body.clientHeight;
     var need = wrap.scrollHeight;
     if (avail > 0 && need > avail + 1) {
