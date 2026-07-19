@@ -9,6 +9,7 @@ Output bisa **PNG** (siap upload) atau **PPTX** (semua elemen editable di Canva/
 - **Customisasi Mendalam**: posisi teks, warna, texture (bisa digeser & di-scale), pattern, dan background gambar (pan/crop).
 - **Custom Font**: Bisa paste link dari Google Fonts langsung di web.
 - **Export PPTX Native**: Elemen seperti text, background, dan kotak-kotak bisa dipindah/diedit terpisah di Canva.
+- **Import Brief (PDF/TXT/MD)**: slide kebentuk otomatis — komparasi (`kiri:`/`kanan:` atau dua judul kolom diakhiri `:`) dan meme (`captop:`/`capbawah:`) terdeteksi sendiri. Aturan lengkap tiap field (topik, eyebrow, judul, dst.) ada di tombol **"Lihat contoh format"** di web; PDF harus PDF teks (bukan scan).
 
 ## Coba lokal
 

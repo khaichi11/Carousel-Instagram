@@ -1,5 +1,5 @@
-import { parseBrief } from "./import-brief.js";
-import { downloadPptx } from "./pptx-export.js?v=9";
+import { parseBrief } from "./import-brief.js?v=11";
+import { downloadPptx } from "./pptx-export.js?v=11";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -582,6 +582,21 @@ function waitImages(el) {
   return Promise.all(imgs.map((im) => (im.complete && im.naturalWidth) ? Promise.resolve() : new Promise((r) => { im.onload = im.onerror = r; })));
 }
 
+/* Fonts load lazily per weight; document.fonts.ready alone can resolve BEFORE a
+ * newly-rendered stage triggers its font requests. Rendering/measuring with the
+ * fallback font then produces wrong wraps and wrong highlight positions. Explicitly
+ * request every family+weight the stage uses and wait for them. */
+async function ensureStageFonts(stage) {
+  const wanted = new Set();
+  stage.querySelectorAll(EDIT_SEL + ",mark,.lead,.rlogo,.cmp-ic").forEach((n) => {
+    const cs = getComputedStyle(n);
+    const fam = cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim();
+    if (fam) wanted.add(`${cs.fontWeight} 32px "${fam}"`);
+  });
+  try { await Promise.all([...wanted].map((f) => document.fonts.load(f))); } catch (e) { /* fallback below */ }
+  await document.fonts.ready;
+}
+
 /* Precompute a font-embed CSS string from our SAME-ORIGIN fonts.css, inlining each
  * woff2 as a data URL. Passing this to html-to-image makes it use these fonts and
  * NOT scan document stylesheets — which is what crashes export when a cross-origin
@@ -610,6 +625,69 @@ async function getFontEmbedCSS() {
   return _fontEmbedCSS;
 }
 
+/* html-to-image rasterizes a CLONE of the DOM inside an SVG, where text re-flows.
+ * On knife-edge lines (content width == column width) the clone can wrap differently
+ * than the live preview. Pin the browser's actual line breaks into the text as real
+ * newlines (+ pre-wrap) so the raster cannot re-wrap. Runs on the throwaway export
+ * stage only, after fonts are loaded and fit is applied. */
+function pinLineBreaks(root) {
+  // A break between two text nodes only needs pinning when nothing already forces
+  // it there — an explicit <br> or a block boundary (e.g. the .lead block) would
+  // otherwise double up with the added newline and create a blank line.
+  const blockOf = (n) => {
+    let e = n.parentElement;
+    while (e && getComputedStyle(e).display.indexOf("inline") === 0) e = e.parentElement;
+    return e;
+  };
+  const hasBrBetween = (a, b) => {
+    const rg = document.createRange();
+    rg.setStartAfter(a); rg.setEndBefore(b);
+    const frag = rg.cloneContents();
+    return !!frag.querySelector("br");
+  };
+  root.querySelectorAll(EDIT_SEL).forEach((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    const range = document.createRange();
+    let lineTop = null, lineH = 0, mutated = false;
+    textNodes.forEach((tn, ti) => {
+      const text = tn.textContent;
+      const re = /\s+|\S+/g;
+      const breaks = []; // token start indices where a new rendered line begins
+      let m;
+      while ((m = re.exec(text))) {
+        if (!m[0].trim()) continue;
+        let r0 = null;
+        try { range.setStart(tn, m.index); range.setEnd(tn, m.index + m[0].length); r0 = range.getClientRects()[0]; } catch (e) {}
+        if (!r0) continue;
+        if (lineTop == null) { lineTop = r0.top; lineH = r0.height; }
+        else if (r0.top > lineTop + Math.max(lineH, r0.height) * 0.6) {
+          lineTop = r0.top; lineH = r0.height;
+          breaks.push(m.index);
+        } else lineH = Math.max(lineH, r0.height);
+      }
+      for (let i = breaks.length - 1; i >= 0; i--) {
+        const bi = breaks[i];
+        if (bi > 0) {
+          // replace the whitespace run before the token with a hard newline
+          let ws = bi - 1;
+          while (ws >= 0 && /\s/.test(tn.textContent[ws])) ws--;
+          tn.textContent = tn.textContent.slice(0, ws + 1) + "\n" + tn.textContent.slice(bi);
+          mutated = true;
+        } else if (ti > 0 && !textNodes[ti - 1].parentElement.closest("mark")
+          && blockOf(textNodes[ti - 1]) === blockOf(tn) && !hasBrBetween(textNodes[ti - 1], tn)) {
+          // break at a node boundary: put the newline in the previous plain node
+          // (skipped inside <mark> — a trailing newline there would draw a padded stub)
+          textNodes[ti - 1].textContent = textNodes[ti - 1].textContent.replace(/\s+$/, "") + "\n";
+          mutated = true;
+        }
+      }
+    });
+    if (mutated && !/pre/.test(getComputedStyle(el).whiteSpace)) el.style.whiteSpace = "pre-wrap";
+  });
+}
+
 /* Rasterize the export stage to PNG, resilient to font/resource embedding errors:
  * use our same-origin font CSS; if html-to-image still throws (e.g. an odd remote
  * resource), retry once skipping font embedding so export never hard-fails. */
@@ -631,9 +709,10 @@ async function renderPng(data) {
   exportStage.parentElement.style.width = w + "px";
   exportStage.parentElement.style.height = h + "px";
   await waitImages(exportStage);
-  await document.fonts.ready;
+  await ensureStageFonts(exportStage);
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   window.refitStage(exportStage); // re-fit now that the real fonts are loaded
+  pinLineBreaks(exportStage);     // freeze line breaks so the raster clone can't re-wrap
   return await stageToPng(w, h);
 }
 async function generatePng() {
@@ -684,33 +763,91 @@ function contrastHex(hex) {
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? "101138" : "FFFFFF";
 }
+/* Extract PPTX text runs from a rendered node, splitting them at the browser's
+ * ACTUAL wrapped lines (each word measured via Range). The exported text carries a
+ * hard break wherever the preview wrapped, so PowerPoint/Canva — whose substituted
+ * fonts have different metrics — can't reflow it differently. That reflow was what
+ * knocked the stabilo highlight boxes off their words. Nested ".ic" chips are
+ * skipped: they're exported separately as their own shape + text box. */
 function extractRuns(node, upper) {
-  const runs = [];
-  const push = (t, o) => { if (t) runs.push(Object.assign({ text: upper ? t.toUpperCase() : t }, o)); };
-  (function walk(n, mark, bold) {
+  const segs = [];
+  (function walk(n, mark, bold, fontSize) {
     n.childNodes.forEach((c) => {
-      if (c.nodeType === 3) push(c.textContent, { mark, bold });
+      if (c.nodeType === 3) { if (c.textContent) segs.push({ tn: c, mark, bold, fontSize }); }
       else if (c.nodeType === 1) {
         const tag = c.tagName.toLowerCase();
-        if (tag === "br") { if (runs.length) runs[runs.length - 1].br = true; }
-        else if (tag === "mark") walk(c, true, bold);
-        else if (c.classList && c.classList.contains("lead")) {
-          const leadCs = getComputedStyle(c);
-          const prevLen = runs.length;
-          walk(c, mark, true);
-          for (let i = prevLen; i < runs.length; i++) runs[i].fontSize = parseFloat(leadCs.fontSize);
-          if (runs.length) runs[runs.length - 1].br = true;
-        } else walk(c, mark, bold);
+        if (tag === "br") segs.push({ br: true });
+        else if (c.classList && c.classList.contains("ic")) return;
+        else if (tag === "mark") walk(c, true, bold, fontSize);
+        else if (c.classList && c.classList.contains("lead")) walk(c, mark, true, parseFloat(getComputedStyle(c).fontSize));
+        else walk(c, mark, bold, fontSize);
       }
     });
-  })(node, false, false);
+  })(node, false, false, 0);
+
+  const runs = [];
+  const range = document.createRange();
+  let cur = null, lineTop = null, lineH = 0, pendingWs = false, sinceBreak = false, justBroke = false;
+
+  const flush = () => { if (cur && cur.text) runs.push(cur); cur = null; };
+  const markBreak = () => { flush(); if (runs.length) runs[runs.length - 1].br = true; };
+  // soft break = the browser wrapped; hard break = an explicit <br> (may be a blank line)
+  const softBreak = () => { pendingWs = false; markBreak(); sinceBreak = false; };
+  const hardBreak = () => {
+    pendingWs = false;
+    if (sinceBreak) markBreak(); else { flush(); runs.push({ text: "", br: true }); }
+    sinceBreak = false; justBroke = true; lineTop = null;
+  };
+  const addText = (t, seg) => {
+    if (!t) return;
+    if (upper) t = t.toUpperCase();
+    if (cur && (cur.mark !== !!seg.mark || cur.bold !== !!seg.bold || (cur.fontSize || 0) !== (seg.fontSize || 0))) flush();
+    if (!cur) { cur = { text: "", mark: !!seg.mark, bold: !!seg.bold }; if (seg.fontSize) cur.fontSize = seg.fontSize; }
+    cur.text += t;
+    if (t.trim()) sinceBreak = true;
+  };
+  const placeToken = (text, top, h, seg) => {
+    if (lineTop == null) { lineTop = top; lineH = h; }
+    else if (top > lineTop + Math.max(lineH, h) * 0.6) {
+      if (!justBroke) softBreak();
+      lineTop = top; lineH = h;
+    } else lineH = Math.max(lineH, h);
+    justBroke = false;
+    if (pendingWs) { if (cur) cur.text += " "; else addText(" ", seg); pendingWs = false; }
+    addText(text, seg);
+  };
+
+  segs.forEach((seg) => {
+    if (seg.br) { hardBreak(); return; }
+    const text = seg.tn.textContent;
+    const re = /\s+|\S+/g;
+    let m;
+    while ((m = re.exec(text))) {
+      const tok = m[0];
+      if (!tok.trim()) { if (cur || runs.length) pendingWs = true; continue; }
+      let rl = null;
+      try {
+        range.setStart(seg.tn, m.index); range.setEnd(seg.tn, m.index + tok.length);
+        rl = range.getClientRects();
+      } catch (e) { /* keep token on the current line */ }
+      if (!rl || !rl.length) { placeToken(tok, lineTop == null ? 0 : lineTop, lineH, seg); continue; }
+      if (rl.length === 1) { placeToken(tok, rl[0].top, rl[0].height, seg); continue; }
+      // token wrapped mid-word (word-break) — split per character
+      for (let ci = 0; ci < tok.length; ci++) {
+        let rr = null;
+        try { range.setStart(seg.tn, m.index + ci); range.setEnd(seg.tn, m.index + ci + 1); rr = range.getClientRects()[0]; } catch (e) {}
+        placeToken(tok[ci], rr ? rr.top : (lineTop || 0), rr ? rr.height : lineH, seg);
+      }
+    }
+  });
+  flush();
   return runs;
 }
 
 // Every text element → its own editable text box (incl. footer handles + badge/rank text).
-const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.list-ic,.trow .name,.trow .val,.rank,.cmp-head,.cmp-tx,.meme-cap,.img-caption,.counter,.handles .h,.handles .ic";
-const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head", "list-ic", "rank", "ic", "h"];
-const CENTER_CLASSES = ["list-ic", "rank", "meme-cap", "counter", "pill-btn", "eyebrow", "ic"];
+const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.list-ic,.trow .name,.trow .val,.rank,.cmp-head,.cmp-tx,.meme-cap,.img-caption,.counter,.handles .ht,.handles .ic";
+const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head", "list-ic", "rank", "ic", "ht"];
+const CENTER_CLASSES = ["list-ic", "rank", "meme-cap", "counter", "pill-btn", "eyebrow", "ic", "val"];
 // Cards/boxes/badges/pills/image-frames/logo chip → editable shapes.
 const SHAPE_SEL = ".card, .table-card, .text-card, .cmp-col, .trow, .meme-frame, .list-ic, .rank, .eyebrow, .pill-btn, .counter, .trow .val, .cmp-head, .handles .ic, .logo-chip";
 
@@ -720,33 +857,168 @@ function collectPptx(stage, markHex, data) {
   const safeNum = (v, fb = 0) => Number.isFinite(v) ? v : fb;
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
+  // fitStage may have scaled the body content down (transform: scale). Client rects
+  // include that scale but computed styles (font-size, padding) do NOT — capture the
+  // factor so exported sizes match what's actually rendered.
+  const wrapEl = stage.querySelector(".stage-body > :first-child");
+  let fitScale = 1;
+  if (wrapEl) {
+    const tf = getComputedStyle(wrapEl).transform;
+    const mm = tf && tf !== "none" ? tf.match(/matrix\(([-\d.e]+),\s*([-\d.e]+)/) : null;
+    if (mm) fitScale = Math.hypot(parseFloat(mm[1]), parseFloat(mm[2])) || 1;
+  }
+  const scaleFor = (node) => (wrapEl && node !== wrapEl && wrapEl.contains(node)) ? fitScale : 1;
+  // A node's own rotation (the tilted eyebrow chip) — exported as real PPTX rotation.
+  const rotationOf = (node) => {
+    const tf = getComputedStyle(node).transform;
+    if (!tf || tf === "none") return 0;
+    const mm = tf.match(/matrix\(([-\d.e]+),\s*([-\d.e]+)/);
+    if (!mm) return 0;
+    const deg = Math.atan2(parseFloat(mm[2]), parseFloat(mm[1])) * 180 / Math.PI;
+    return Math.abs(deg) < 0.3 ? 0 : deg;
+  };
+  // For rotated nodes getBoundingClientRect is the axis-aligned envelope; use the
+  // unrotated box at the same centre and let PPTX apply the rotation itself.
+  const boxOf = (node, r, k) => {
+    const rot = rotationOf(node);
+    if (!rot) return { x: r.left - sr.left, y: r.top - sr.top, w: r.width, h: r.height, rot: 0 };
+    const w = node.offsetWidth * k, h = node.offsetHeight * k;
+    return { x: r.left - sr.left + (r.width - w) / 2, y: r.top - sr.top + (r.height - h) / 2, w, h, rot };
+  };
+
+  // Text containing stabilo marks is exported as SEGMENTED text boxes: each marked
+  // word (per rendered line) becomes its own box centred on its highlight rect, and
+  // plain fragments are anchored at their measured x. A single flowing text box can't
+  // guarantee that: when PowerPoint/Canva substitute a font with different glyph
+  // widths, words drift horizontally inside the line and slip out of the fixed
+  // highlight rectangles. Per-fragment anchoring keeps them glued for ANY font.
+  const emitSegmented = (node, cs, k) => {
+    const upper = cs.textTransform === "uppercase";
+    const fontPx = clamp(safeNum(parseFloat(cs.fontSize), 18) * k, 8, 220);
+    const lsRaw = cs.letterSpacing;
+    const letterSpacingPx = (lsRaw && lsRaw !== "normal") ? parseFloat(lsRaw) * k : 0;
+    const font = cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim();
+    const weight = parseInt(cs.fontWeight) || 400;
+    const baseColor = rgbToHex(cs.color);
+
+    const flat = [];
+    (function walk(n, mk, bold, fontSize) {
+      n.childNodes.forEach((c) => {
+        if (c.nodeType === 3) { if (c.textContent) flat.push({ tn: c, mk, bold, fontSize }); }
+        else if (c.nodeType === 1) {
+          const tag = c.tagName.toLowerCase();
+          if (tag === "br" || (c.classList && c.classList.contains("ic"))) return;
+          if (tag === "mark") walk(c, c, bold, fontSize);
+          else if (c.classList && c.classList.contains("lead")) walk(c, mk, true, parseFloat(getComputedStyle(c).fontSize));
+          else walk(c, mk, bold, fontSize);
+        }
+      });
+    })(node, null, false, 0);
+
+    const range = document.createRange();
+    const segs = [];
+    let cur = null, lineTop = null, lineH = 0;
+    const startSeg = (p) => { cur = { text: p.text, mk: p.mk, bold: p.bold, fontSize: p.fontSize, l: p.l, r: p.r, t: p.t, b: p.b }; segs.push(cur); };
+    const addPiece = (p) => {
+      const newLine = lineTop == null || p.t > lineTop + Math.max(lineH, p.b - p.t) * 0.6;
+      if (newLine) { lineTop = p.t; lineH = p.b - p.t; startSeg(p); return; }
+      lineH = Math.max(lineH, p.b - p.t);
+      if (!cur || cur.mk !== p.mk || cur.bold !== p.bold || cur.fontSize !== p.fontSize) { startSeg(p); return; }
+      cur.text += (p.glue ? "" : " ") + p.text;
+      cur.l = Math.min(cur.l, p.l); cur.r = Math.max(cur.r, p.r);
+      cur.t = Math.min(cur.t, p.t); cur.b = Math.max(cur.b, p.b);
+    };
+    flat.forEach((sg) => {
+      const text = sg.tn.textContent;
+      const re = /\s+|\S+/g; let m;
+      while ((m = re.exec(text))) {
+        const tok = m[0];
+        if (!tok.trim()) continue;
+        let rl = [];
+        try { range.setStart(sg.tn, m.index); range.setEnd(sg.tn, m.index + tok.length); rl = Array.from(range.getClientRects()); } catch (e) {}
+        if (rl.length <= 1) {
+          if (rl[0]) addPiece({ text: tok, mk: sg.mk, bold: sg.bold, fontSize: sg.fontSize, l: rl[0].left, r: rl[0].right, t: rl[0].top, b: rl[0].bottom });
+        } else {
+          for (let ci = 0; ci < tok.length; ci++) {
+            try {
+              range.setStart(sg.tn, m.index + ci); range.setEnd(sg.tn, m.index + ci + 1);
+              const rr = range.getClientRects()[0];
+              if (rr) addPiece({ text: tok[ci], mk: sg.mk, bold: sg.bold, fontSize: sg.fontSize, l: rr.left, r: rr.right, t: rr.top, b: rr.bottom, glue: ci > 0 });
+            } catch (e) { /* keep remaining chars */ }
+          }
+        }
+      }
+    });
+
+    segs.forEach((sgm) => {
+      if (!sgm.text.trim()) return;
+      const x = sgm.l - sr.left, y = sgm.t - sr.top, w = sgm.r - sgm.l, h = sgm.b - sgm.t;
+      if (w < 1 || h < 2) return;
+      const isMark = !!sgm.mk;
+      // colour comes from the RENDERED style (dark-theme statement marks stay white)
+      const color = isMark ? rgbToHex(getComputedStyle(sgm.mk).color) : baseColor;
+      const padH = 6 * k;
+      const slack = Math.min(160, Math.max(24, w * 0.3));
+      els.push({
+        x: safeNum(isMark ? x - slack / 2 : x - 2), y: safeNum(y - padH / 2),
+        w: safeNum(w + slack), h: safeNum(h + padH),
+        rotate: 0,
+        runs: [{ text: upper ? sgm.text.toUpperCase() : sgm.text, bold: sgm.bold, fontSize: sgm.fontSize ? sgm.fontSize * k : 0 }],
+        font, size: sgm.fontSize ? clamp(sgm.fontSize * k, 8, 220) : fontPx, weight,
+        color,
+        align: isMark ? "center" : "left",
+        valign: "middle",
+        lineh: 1.0, linePx: 0,
+        charSpacing: clamp(safeNum(letterSpacingPx, 0), -2, 8),
+        markText: color, markFill: "",
+      });
+    });
+  };
+
   // ---- editable text boxes ----
   stage.querySelectorAll(EDIT_SEL).forEach((node) => {
     const r = node.getBoundingClientRect();
     if (r.width < 3 || r.height < 3) return;
     const cs = getComputedStyle(node);
+    if (node.querySelector("mark")) { emitSegmented(node, cs, scaleFor(node)); return; }
     const runs = extractRuns(node, cs.textTransform === "uppercase");
     if (!runs.length) return;
+    const k = scaleFor(node);
+    const box = boxOf(node, r, k);
     const lsRaw = cs.letterSpacing;
-    const letterSpacingPx = (lsRaw && lsRaw !== "normal") ? parseFloat(lsRaw) : 0;
+    const letterSpacingPx = (lsRaw && lsRaw !== "normal") ? parseFloat(lsRaw) * k : 0;
     const isDisplay = node.classList.contains("display") || node.classList.contains("statement") || node.classList.contains("section-title");
     const isBadge = node.classList.contains("list-ic") || node.classList.contains("rank");
     const isSmall = node.classList.contains("eyebrow") || node.classList.contains("pill-btn") || node.classList.contains("counter");
-    const padW = isBadge ? 0 : isDisplay ? 12 : isSmall ? 8 : 6;
-    const padH = isBadge ? 0 : isDisplay ? 12 : isSmall ? 6 : 6;
+    const padW = (isBadge ? 0 : isDisplay ? 12 : isSmall ? 8 : 6) * k;
+    const padH = (isBadge ? 0 : isDisplay ? 12 : isSmall ? 6 : 6) * k;
+    const fontPx = clamp(safeNum(parseFloat(cs.fontSize), 18) * k, 8, 220);
+    const linePxRaw = parseFloat(cs.lineHeight);
+    const linePx = (Number.isFinite(linePxRaw) ? linePxRaw : fontPx * 1.15) * k;
+    runs.forEach((run) => { if (run.fontSize) run.fontSize *= k; });
     const elemMarkHex = (markHex || (isDisplay ? "F7B400" : "FFD65A")).replace("#", "");
     const centered = CENTER_CLASSES.some((c) => node.classList.contains(c));
+    const align = centered ? "center" : (cs.textAlign.indexOf("center") >= 0 ? "center" : (cs.textAlign.indexOf("right") >= 0 || cs.textAlign.indexOf("end") >= 0) ? "right" : "left");
+    // Widen the box (anchored on its alignment) so a slightly wider substituted font
+    // can't re-wrap the hard-broken lines; the box itself is invisible.
+    let bx = box.x - padW / 2, bw = box.w + padW;
+    const slack = Math.min(140, Math.max(16, bw * 0.18));
+    if (align === "center") { bx -= slack / 2; bw += slack; }
+    else if (align === "right") { bx -= slack; }
+    bw += align === "center" ? 0 : slack;
     els.push({
-      x: safeNum(r.left - sr.left - padW / 2), y: safeNum(r.top - sr.top - padH / 2),
-      w: safeNum(r.width + padW), h: safeNum(r.height + padH),
+      x: safeNum(bx), y: safeNum(box.y - padH / 2),
+      w: safeNum(bw), h: safeNum(box.h + padH),
+      rotate: box.rot,
       runs,
       font: cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim(),
-      size: clamp(safeNum(parseFloat(cs.fontSize), 18), 8, 220),
+      size: fontPx,
       weight: parseInt(cs.fontWeight) || 400,
       color: rgbToHex(cs.color),
-      align: centered ? "center" : (cs.textAlign.indexOf("center") >= 0 ? "center" : (cs.textAlign.indexOf("right") >= 0 || cs.textAlign.indexOf("end") >= 0) ? "right" : "left"),
+      align,
       valign: (isBadge || MID_CLASSES.some((c) => node.classList.contains(c))) ? "middle" : "top",
-      lineh: clamp(safeNum(parseFloat(cs.lineHeight) / parseFloat(cs.fontSize), 1.15), 0.8, 2.5),
+      lineh: clamp(safeNum(linePx / fontPx, 1.15), 0.7, 2.5),
+      linePx: safeNum(linePx, fontPx * 1.15),
       charSpacing: clamp(safeNum(letterSpacingPx, 0), -2, 8),
       markText: contrastHex(elemMarkHex), markFill: elemMarkHex,
     });
@@ -779,11 +1051,14 @@ function collectPptx(stage, markHex, data) {
 
     if (fillAlpha <= 0 && (!cs.backgroundImage || cs.backgroundImage === "none")) return;
 
+    const k = scaleFor(node);
+    const box = boxOf(node, r, k);
     blocks.push({
-      x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
-      w: safeNum(r.width), h: safeNum(r.height),
+      x: safeNum(box.x), y: safeNum(box.y),
+      w: safeNum(box.w), h: safeNum(box.h),
+      rotate: box.rot,
       fill: { color: fillHex, transparency: Math.round((1 - fillAlpha) * 100) },
-      roundness: parseFloat(cs.borderRadius) || 0
+      roundness: (parseFloat(cs.borderRadius) || 0) * k
     });
   });
 
@@ -793,14 +1068,28 @@ function collectPptx(stage, markHex, data) {
   //      the cards so it sits above them and below the text. ----
   stage.querySelectorAll("mark").forEach((mk) => {
     const isDisplay = !!mk.closest(".display, .statement, .section-title");
-    const fill = (markHex || (isDisplay ? "F7B400" : "FFD65A")).replace("#", "");
     const mkCs = getComputedStyle(mk);
-    const mkRadius = parseFloat(mkCs.borderRadius) || (isDisplay ? 8 : 5);
+    // Use the ACTUAL rendered highlight colour: solid background (display marks) or
+    // the first opaque stop of the band gradient (statement/list marks use gold-soft,
+    // not gold — hardcoding one hex made exported boxes the wrong shade).
+    let fill = (markHex || "").replace("#", "");
+    if (!fill) {
+      const bc = mkCs.backgroundColor;
+      const bcAlpha = (bc.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([^)]+)\)/) || [])[1];
+      if (bc && bc !== "transparent" && (bcAlpha === undefined || parseFloat(bcAlpha) > 0.05)) fill = rgbToHex(bc);
+      else {
+        const stops = (mkCs.backgroundImage || "").match(/rgba?\([^)]*\)/g) || [];
+        const solid = stops.find((s) => { const p = s.match(/[\d.]+/g); return p && (p.length < 4 || parseFloat(p[3]) > 0.05); });
+        fill = solid ? rgbToHex(solid) : (isDisplay ? "F7B400" : "FFD65A");
+      }
+    }
+    const k = scaleFor(mk);
+    const mkRadius = (parseFloat(mkCs.borderRadius) || (isDisplay ? 8 : 5)) * k;
     const useBand = !mk.closest(".display");
-    const padTop = parseFloat(mkCs.paddingTop) || 0;
-    const padBottom = parseFloat(mkCs.paddingBottom) || 0;
-    const padLeft = parseFloat(mkCs.paddingLeft) || 0;
-    const padRight = parseFloat(mkCs.paddingRight) || 0;
+    const padTop = (parseFloat(mkCs.paddingTop) || 0) * k;
+    const padBottom = (parseFloat(mkCs.paddingBottom) || 0) * k;
+    const padLeft = (parseFloat(mkCs.paddingLeft) || 0) * k;
+    const padRight = (parseFloat(mkCs.paddingRight) || 0) * k;
     // Measure only the marked text content via Range; this avoids exporting a
     // rectangle that spans the rest of the line in wrapped headings.
     const rg = document.createRange();
@@ -867,7 +1156,7 @@ async function renderSlideForPptx(data) {
   exportStage.parentElement.style.width = w + "px";
   exportStage.parentElement.style.height = h + "px";
   await waitImages(exportStage);
-  await document.fonts.ready;
+  await ensureStageFonts(exportStage);
   // Extra frame delay for layout to settle (especially for compare/list cards)
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
   window.refitStage(exportStage); // re-fit with real fonts before measuring
@@ -897,12 +1186,16 @@ downloadPptxBtn.addEventListener("click", async () => {
       }
     }
     statusMsg.textContent = "Menyusun file PPTX…";
+    // Version + time in the filename so a fresh export can't be confused with an
+    // older download of the same name sitting in the Downloads folder.
+    const t = new Date();
+    const fname = `carousel-pastipintar-v11-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
     try {
-      await downloadPptx(specs, "carousel-pastipintar.pptx");
+      await downloadPptx(specs, fname);
     } catch (e) {
       throw new Error(`Gagal saat menyusun PPTX (PptxGenJS): ${e.stack || e.message}`);
     }
-    statusMsg.textContent = "PPTX selesai! Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint)."; statusMsg.className = "status-msg ok";
+    statusMsg.textContent = `PPTX selesai (build v11) → ${fname}. Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint).`; statusMsg.className = "status-msg ok";
   } catch (err) { statusMsg.textContent = "Error PPTX: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
   finally { downloadPptxBtn.disabled = false; }
 });

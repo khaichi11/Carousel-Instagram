@@ -44,13 +44,23 @@
 
     <div class="example-box" id="exampleBox" style="display:none">
       <div class="example-guide">
-        <strong>Cara bikin file buat di-upload</strong>
+        <strong>Aturan format brief (biar slide kebentuk otomatis)</strong>
         <ol>
-          <li>Tulis di aplikasi teks apa aja (Notes, Word, Google Docs).</li>
-          <li>Tiap slide dipisah baris <code>=== Slide ===</code>.</li>
-          <li>Isi field: <code>layout</code>, <code>theme</code>, <code>topik</code>, <code>judul</code>, <code>sub</code>. Poin diawali <code>-</code>.</li>
-          <li>Simpan sebagai <code>.txt</code>, atau <b>Save/Print as PDF</b> lalu drop ke sini.</li>
-          <li>Highlight kata pakai <code>**kata**</code>. Tabel: <code>Nama :: Nilai</code>.</li>
+          <li><b>Pisah slide</b> pakai baris <code>=== Slide ===</code> (atau header <code>Slide 1 — Topik</code>). Baris diawali <code>//</code> = catatan, diabaikan.</li>
+          <li><b>Field per slide</b> (semua opsional):
+            <code>layout</code> = jenis slide (cover / highlight / list / table / compare / meme / cta) ·
+            <code>theme</code> = warna dasar (dark = navy, light = terang) ·
+            <code>topik</code> = teks badge pil kuning di pojok kanan atas ·
+            <code>eyebrow</code> = label kecil kuning miring di atas judul (mis. "STOP DULU!") ·
+            <code>judul</code> = teks utama ·
+            <code>sub</code> = kalimat pendukung di bawah judul ·
+            <code>tombol</code> = tombol pil kuning.
+            Kalau <code>layout</code> nggak ditulis, jenis slide dideteksi otomatis dari isi.</li>
+          <li><b>Highlight kata penting</b>: bungkus pakai <code>**kata**</code> → jadi stabilo kuning, ikut ke PNG &amp; PPTX.</li>
+          <li><b>List / Tabel</b>: tiap poin diawali <code>-</code> atau emoji. Format list: <code>Judul :: penjelasan</code>. Tabel: <code>Nama :: Angka</code> (nomor urut otomatis).</li>
+          <li><b>Komparasi — otomatis</b>: tulis <code>kiri:</code> &amp; <code>kanan:</code> diikuti poin masing-masing — atau cukup dua baris judul kolom yang diakhiri <code>:</code> lalu poinnya. Dua kolom langsung kebentuk.</li>
+          <li><b>Meme — otomatis</b>: isi <code>captop:</code> / <code>capbawah:</code> (atau tulis "meme" di topik). Gambar meme di-upload di editor setelah import.</li>
+          <li><b>Aturan upload PDF</b>: harus PDF <b>teks</b> — hasil <b>Save/Export as PDF</b> dari Google Docs, Word, atau Notion, dengan struktur sama kayak contoh di samping. PDF hasil scan/foto tidak bisa dibaca (teksnya bukan teks asli), jadi otomatisasinya gagal.</li>
         </ol>
       </div>
       <pre class="example-code" id="exampleCode">memuat contoh…</pre>
@@ -133,10 +143,10 @@
 </div>
 
 <script src="textures.js?v=9"></script>
-<script src="stage.js?v=9"></script>
+<script src="stage.js?v=11"></script>
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=9"></script>
+<script type="module" src="app.js?v=11"></script>
 </body>
 </html>

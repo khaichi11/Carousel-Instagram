@@ -11,6 +11,7 @@
  * (rendering + measuring happen in app.js). 1 px = 1/96 in; font px -> pt = px*0.75.
  */
 const PX = 1 / 96;
+const normRot = (deg) => Math.round((((deg % 360) + 360) % 360) * 100) / 100;
 
 export async function downloadPptx(specs, fileName) {
   const Pptx = window.PptxGenJS;
@@ -32,12 +33,17 @@ export async function downloadPptx(specs, fileName) {
     (spec.blocks || []).forEach((blk) => {
       const x = Number(blk.x), y = Number(blk.y), w = Number(blk.w), h = Number(blk.h);
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
-      s.addShape(pptx.ShapeType.rect, {
+      // rectRadius only applies to roundRect (plain rect silently ignores it) and is
+      // measured in INCHES; cap at half the short side so pill shapes become capsules.
+      const radPx = Math.max(0, Math.min(Number(blk.roundness) || 0, Math.min(w, h) / 2));
+      const opts = {
         x: x * PX, y: y * PX, w: w * PX, h: h * PX,
         fill: blk.fill,
         line: { type: "none" },
-        rectRadius: blk.roundness ? Math.min(blk.roundness / w, 0.5) : 0
-      });
+      };
+      if (blk.rotate) opts.rotate = normRot(blk.rotate);
+      if (radPx > 0.5) opts.rectRadius = radPx * PX;
+      s.addShape(radPx > 0.5 ? pptx.ShapeType.roundRect : pptx.ShapeType.rect, opts);
     });
 
     // 3. editable images (placed at their visible object-fit rect — full picture, no crop)
@@ -66,20 +72,26 @@ export async function downloadPptx(specs, fileName) {
       });
 
       const charSpacing = el.charSpacing ? Math.round(el.charSpacing * 0.75 * 100) / 100 : 0;
-      const lineSpacingMultiple = Math.min(2.5, Math.max(0.7, el.lineh || 1.15));
-
-      s.addText(runs, {
+      const opts = {
         x: x * PX, y: y * PX, w: w * PX, h: h * PX,
         fontFace: el.font || "Plus Jakarta Sans",
         fontSize: Math.max(6, el.size * 0.75),
         align: el.align || "left",
         valign: el.valign || "top",
         color: el.color,
-        lineSpacingMultiple,
         charSpacing,
         margin: 0, autoFit: false, wrap: true, isTextBox: true,
         paraSpaceBefore: 0, paraSpaceAfter: 0,
-      });
+      };
+      if (el.rotate) opts.rotate = normRot(el.rotate);
+      // EXACT line spacing (pt) pins every line to the same y as the browser preview
+      // even when the viewer substitutes a font with different metrics. A multiple
+      // would scale the substituted font's own line height and drift per line —
+      // which is what pushed the stabilo boxes off their words. Fallback: multiple.
+      if (Number.isFinite(el.linePx) && el.linePx > 0) opts.lineSpacing = Math.round(el.linePx * 0.75 * 100) / 100;
+      else opts.lineSpacingMultiple = Math.min(2.5, Math.max(0.7, el.lineh || 1.15));
+
+      s.addText(runs, opts);
     });
   });
 

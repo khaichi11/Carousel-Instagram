@@ -14,6 +14,7 @@ http.createServer((req, res) => {
   if (p === "/") p = "/index.html";
   const fp = path.join(ROOT, p);
   if (!fp.startsWith(ROOT) || !fs.existsSync(fp) || fs.statSync(fp).isDirectory()) { res.writeHead(404); res.end("404"); return; }
-  res.writeHead(200, { "Content-Type": TYPES[path.extname(fp)] || "application/octet-stream" });
+  // no-cache: dev browsers heuristically cache HTML/JS without this, serving stale code
+  res.writeHead(200, { "Content-Type": TYPES[path.extname(fp)] || "application/octet-stream", "Cache-Control": "no-cache" });
   fs.createReadStream(fp).pipe(res);
 }).listen(PORT, () => console.log(`Static site on http://localhost:${PORT}`));

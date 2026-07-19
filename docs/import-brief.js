@@ -72,6 +72,7 @@ function splitChunks(text) {
 
   for (let raw of lines) {
     const line = raw.replace(/\s+$/g, "");
+    if (/^\s*\/\//.test(line)) continue; // "//" lines are comments (legend in contoh)
     const headerM = line.match(HEADER_RE);
     const sep = isSeparator(line);
 
@@ -100,13 +101,18 @@ function parseChunk(chunk) {
   const fields = {};
   const bullets = [];
   const colBullets = { colA: [], colB: [] };
+  const groups = [];      // auto-compare: "Judul kolom:" lines each followed by poin
   const loose = [];
   let afterColon = false; // lines indented under a "…:" line count as bullets
   let curCol = null;      // 'colA' | 'colB' when inside a compare column
+  let curGroup = null;
 
   const pushBullet = (b) => {
     if (curCol) colBullets[curCol].push(b);
-    else bullets.push(b);
+    else {
+      bullets.push(b);
+      if (curGroup) curGroup.items.push(b);
+    }
   };
 
   for (const line of chunk.lines) {
@@ -120,12 +126,22 @@ function parseChunk(chunk) {
       fields[key] = kv[2].trim();
       if (key === "colA") curCol = "colA";
       else if (key === "colB") curCol = "colB";
+      else curGroup = null;
       afterColon = true; // header line introduces its column's items
       continue;
     }
     const indented = /^\s+\S/.test(line);
     if (isBulletLine(t) || (afterColon && indented)) {
       pushBullet(stripBullet(t));
+      continue;
+    }
+    // A short line ending with ":" starts a column group — two of these (each with
+    // their own poin) turn the slide into an automatic comparison.
+    if (/^[^:]{2,60}:$/.test(t)) {
+      curGroup = { head: t.replace(/:\s*$/, "").trim(), items: [] };
+      groups.push(curGroup);
+      loose.push(t);
+      afterColon = true;
       continue;
     }
     loose.push(t);
@@ -135,7 +151,7 @@ function parseChunk(chunk) {
   const looseText = loose.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   const looseLines = loose.filter((l) => l.trim());
 
-  return { fields, bullets, colBullets, loose: looseText, looseLines, topic: chunk.topic };
+  return { fields, bullets, colBullets, groups: groups.filter((g) => g.items.length), loose: looseText, looseLines, topic: chunk.topic };
 }
 
 export function parseBrief(text) {
@@ -154,6 +170,13 @@ export function parseBrief(text) {
     if (!type) {
       if ((f.colA || p.colBullets.colA.length) && (f.colB || p.colBullets.colB.length)) {
         type = "compare";
+      } else if (p.groups.length >= 2) {
+        // two "Judul kolom:" groups with their own poin → automatic comparison
+        type = "compare";
+      } else if (f.capTop || f.capBottom || /\bmeme\b/i.test(f.topic || p.topic || "")) {
+        // caption fields (or "meme" in the topic) → automatic meme slide;
+        // the image itself is uploaded in the editor after import
+        type = "meme";
       } else if (p.bullets.length >= 2) {
         const valued = p.bullets.filter((b) => /(::|\|)/.test(b));
         const numeric = valued.filter((b) => looksNumeric(b.split(/::|\|/).slice(1).join(" ")));
@@ -187,9 +210,16 @@ export function parseBrief(text) {
     let colA = f.colA || "", colB = f.colB || "", itemsA = "", itemsB = "";
 
     if (type === "compare") {
-      itemsA = p.colBullets.colA.join("\n");
-      itemsB = p.colBullets.colB.join("\n");
-      if (!title && p.looseLines.length) title = p.looseLines[0];
+      itemsA = p.colBullets.colA.join("\n") || (p.groups[0] ? p.groups[0].items.join("\n") : "");
+      itemsB = p.colBullets.colB.join("\n") || (p.groups[1] ? p.groups[1].items.join("\n") : "");
+      if (!colA && p.groups[0]) colA = p.groups[0].head;
+      if (!colB && p.groups[1]) colB = p.groups[1].head;
+      if (!title) {
+        // first loose line that is NOT a column header becomes the slide title
+        const heads = new Set(p.groups.map((g) => g.head));
+        const cand = p.looseLines.find((l) => !heads.has(l.replace(/:\s*$/, "").trim()));
+        if (cand) title = cand;
+      }
     } else if (type === "list" || type === "table") {
       items = p.bullets.join("\n");
       if (!title) title = p.looseLines[0] || topic || "";

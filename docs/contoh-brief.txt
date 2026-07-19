@@ -1,3 +1,30 @@
+// ================== CARA PAKAI FILE INI ==================
+// Pisah tiap slide dengan baris "=== Slide ===". Baris "//" = catatan, diabaikan.
+// SEMUA field opsional — kalau "layout" tidak ditulis, jenis slide dideteksi
+// otomatis dari isinya (poin -> list/tabel, dua kolom -> komparasi, dst).
+//
+// ARTI TIAP FIELD:
+// layout  : cover | highlight | list | table | compare | meme | cta
+// theme   : dark (navy) | light (terang)
+// align   : top | center | bottom — posisi vertikal teks
+// topik   : teks badge pil kuning di POJOK KANAN ATAS slide
+// eyebrow : label kecil kuning MIRING di atas judul (mis. "STOP DULU!")
+// judul   : teks utama slide — bungkus **kata** biar dapat stabilo kuning
+// sub     : kalimat pendukung di bawah judul
+// tombol  : tombol pil kuning di bawah teks
+//
+// LIST  : tiap poin diawali "-" atau emoji. Format "Judul :: penjelasan".
+// TABEL : poin format "Nama :: Angka" (nomor urut otomatis).
+// KOMPARASI (otomatis): pakai "kiri:" & "kanan:" + poinnya — ATAU cukup dua
+//   baris judul kolom yang diakhiri ":" lalu poin di bawah masing-masing.
+// MEME (otomatis): isi "captop:" / "capbawah:" (atau tulis "meme" di topik).
+//   Gambar meme di-upload di editor setelah import.
+//
+// ATURAN PDF: harus PDF TEKS (Save/Export as PDF dari Google Docs, Word,
+//   atau Notion). PDF hasil scan/foto tidak bisa dibaca. Struktur isinya
+//   sama persis dengan file ini.
+// =========================================================
+
 === Slide ===
 layout: cover
 theme: dark
@@ -8,24 +35,27 @@ judul: Jangan pilih jurusan cuma karena **gengsi**
 sub: Karena yang menjalani kuliahnya nanti… ya kamu. Bukan mereka.
 
 === Slide ===
-layout: list
+layout: compare
 theme: dark
 topik: Realita
-judul: Orang lain cuma lihat kulitnya
+judul: Yang Dilihat vs Yang Dijalani
+kiri: Yang orang lain lihat
 - 🏫 Nama universitas
 - 🎓 Nama jurusan
 - 📊 Ranking kampus
-- 💼 Gaji yang katanya gede
-
-=== Slide ===
-layout: list
-theme: light
-topik: Realita
-judul: Tapi kamu yang menjalaninya
+kanan: Yang kamu jalani
 - 📚 Tumpukan tugas
 - 🧠 Materi kuliah tiap hari
 - ⏳ Bertahun-tahun belajar
-- 💼 Karier setelah lulus
+
+=== Slide ===
+topik: Ekspektasi vs Realita
+Ekspektasi:
+- ✨ Kuliah santai
+- ☕ Nongkrong tiap hari
+Realita:
+- 📚 Deadline tugas numpuk
+- 🌙 Begadang ngerjain laporan
 
 === Slide ===
 layout: highlight
@@ -79,6 +109,11 @@ judul: Kampus paling berprestasi
 📗 Universitas Brawijaya :: 606
 🔵 Universitas Indonesia :: 410
 🌿 IPB University :: 300
+
+=== Slide ===
+topik: Meme
+captop: Jalur mandiri be like:
+capbawah: Dompet orang tua: 💀
 
 === Slide ===
 layout: cta

@@ -137,7 +137,7 @@
     stage.style.height = h + "px";
 
     // custom font injection
-    if (d.customFontUrl) {
+    if (d.customFontUrl && d.font) {
       var linkId = "custom-font-" + d.font.replace(/\s+/g, "-");
       if (!document.getElementById(linkId)) {
         var link = document.createElement("link");
@@ -222,9 +222,11 @@
     // Remember alignment so refits (after fonts load, on export) keep the same anchor.
     stage.setAttribute("data-fit-align", align);
 
+    // Handle text sits in its own .ht span so the PPTX export can grab it separately
+    // from the .ic chip (otherwise "IG"/"@" got duplicated into the handle text box).
     var handles = stage.querySelector(".handles");
-    if (d.igHandle) handles.appendChild(el("span", "h", '<span class="ic">IG</span>' + esc(d.igHandle)));
-    if (d.website) handles.appendChild(el("span", "h", '<span class="ic">@</span>' + esc(d.website)));
+    if (d.igHandle) handles.appendChild(el("span", "h", '<span class="ic">IG</span><span class="ht">' + esc(d.igHandle) + "</span>"));
+    if (d.website) handles.appendChild(el("span", "h", '<span class="ic">@</span><span class="ht">' + esc(d.website) + "</span>"));
 
     fitStage(stage);
   }
