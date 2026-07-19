@@ -264,8 +264,20 @@ input[type="range"]:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(247,180
 .cp-pick, .cp-hex, .cp-num, .cp-swatch { border-color: var(--border); }
 .cp-eye, .cp-fav { font-size: 12px; padding: 4px 6px; }
 
-/* Slide navigator: jump between slides; active one highlighted. */
-.slide-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+/* Slide navigator: jump between slides; active one highlighted. Sticky so it
+ * follows the viewport while editing — no scrolling back up to switch slides.
+ * (Sticks below the sticky app header; on small screens the header is static,
+ * so it sticks to the very top instead.) */
+.slide-nav {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  position: sticky; top: var(--header-h, 92px); z-index: 30;
+  background: var(--card);
+  padding: 10px 2px; margin: 0 0 10px;
+  max-height: 96px; overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+}
+/* Cards scrolled to via the navigator land BELOW the sticky header + nav. */
+.slide-card { scroll-margin-top: calc(var(--header-h, 92px) + 62px); }
 .nav-chip {
   border: 1.5px solid var(--border); background: #fff; color: var(--text-soft);
   border-radius: 999px; padding: 6px 12px 6px 6px; font-family: inherit; font-weight: 700;
@@ -321,5 +333,7 @@ details.adv .inner { padding: 2px 2px 14px; }
   .header-actions { flex-wrap: wrap; gap: 6px; }
   .tpl-grid { grid-template-columns: 1fr 1fr; }
   .opt-row.three { grid-template-columns: 1fr; }
+  .slide-nav { top: 0; } /* header is static on small screens */
+  .slide-card { scroll-margin-top: 70px; }
 }
 .opt-row.three { grid-template-columns: 1fr 1fr 1fr; }

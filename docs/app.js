@@ -113,9 +113,12 @@ const state = {
   bgImage: null,
   briefText: "",
   settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5",
-    bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155 },
+    bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
+    bgX: 50, bgY: 50, bgScale: 100 },
   slides: DEFAULT_SLIDES.map(freshSlide),
 };
+// Lets shared controls (transform sliders) bound to settings repaint every slide.
+state.settings._send = () => { refreshAll(); markDirty(); };
 
 let LOGO_DATAURL = "logo/logo.png";
 
@@ -165,8 +168,10 @@ let autoTimer = null;
 let storageWarned = false;
 
 function snapshot() {
+  const settings = Object.assign({}, state.settings);
+  delete settings._send; // functions can't be structured-cloned into IndexedDB
   return {
-    settings: Object.assign({}, state.settings),
+    settings,
     bgImage: state.bgImage,
     briefText: state.briefText,
     slides: state.slides.map((s) => { const c = Object.assign({}, s); delete c._send; return c; }),
@@ -286,7 +291,7 @@ function newProject() {
     current.name = "Tanpa Judul"; current.createdAt = Date.now();
     current.thumb = null; current.dirty = false; current.lastAuto = null; current.lastManual = null;
     state.bgImage = null; state.briefText = "";
-    Object.assign(state.settings, { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155 });
+    Object.assign(state.settings, { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgX: 50, bgY: 50, bgScale: 100 });
     state.slides = DEFAULT_SLIDES.map(freshSlide);
     lastPngs = [];
     syncGlobalInputs();
@@ -457,8 +462,13 @@ function slideData(slide, idx, logo) {
     bgImage: slide.bgMode === "custom" ? (slide.bgImage || null) : slide.bgMode === "global" ? (state.bgImage || null) : null,
     textColor: slide.textColor, titleColor: slide.titleColor, markColor: slide.markColor,
     texture: slide.texture, textureTone: slide.textureTone, textureOpacity: slide.textureOpacity, pattern: slide.pattern,
-    bgX: slide.bgX, bgY: slide.bgY, bgZoom: slide.bgZoom, 
-    imgX: slide.imgX, imgY: slide.imgY, imgZoom: slide.imgZoom,
+    // Global-mode slides inherit the GLOBAL image transform (position + zoom) so
+    // every slide shows the background identically; custom mode keeps its own.
+    // (The ?? fallbacks also fix the Size slider: it writes *Scale, renderer reads *Zoom.)
+    bgX: slide.bgMode === "global" ? (state.settings.bgX ?? 50) : slide.bgX,
+    bgY: slide.bgMode === "global" ? (state.settings.bgY ?? 50) : slide.bgY,
+    bgZoom: slide.bgMode === "global" ? (state.settings.bgScale ?? 100) : (slide.bgScale ?? slide.bgZoom),
+    imgX: slide.imgX, imgY: slide.imgY, imgZoom: slide.imgScale ?? slide.imgZoom,
     textureX: slide.textureX, textureY: slide.textureY, textureScale: slide.textureScale, 
     patternX: slide.patternX, patternY: slide.patternY, patternScale: slide.patternScale,
     font: state.settings.font, customFontUrl: state.settings.customFontUrl, ratio: state.settings.ratio,
@@ -606,6 +616,12 @@ function renderGlobalBgEditor() {
     releaseImg.title = "Kembali ke tampilan tema; gambar custom milik tiap slide tetap tersimpan";
     releaseImg.addEventListener("click", () => { state.slides.forEach((s) => { if (s.bgMode === "global") s.bgMode = ""; }); renderSlides(); });
     imgActions.appendChild(applyImg); imgActions.appendChild(releaseImg);
+  }
+  // Global image position/zoom — inherited live by every slide in global mode.
+  const tHost = document.getElementById("bgGlobalTransform");
+  if (tHost) {
+    tHost.innerHTML = "";
+    tHost.appendChild(buildTransformControls(state.settings, "bg", "Posisi & zoom gambar global (berlaku untuk semua slide global)"));
   }
 }
 
@@ -1070,9 +1086,10 @@ function buildCard(slide, idx) {
     bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
   } else if (slide.bgMode === "global") {
     const note = document.createElement("div"); note.className = "field-hint";
-    note.textContent = state.bgImage ? "Slide ini mengikuti background gambar global dari Pengaturan Global." : "Mode global aktif — upload gambarnya di Pengaturan Global.";
+    note.textContent = state.bgImage
+      ? "Slide ini mengikuti gambar, posisi & zoom background global (atur di Pengaturan Global — berlaku serentak untuk semua slide global)."
+      : "Mode global aktif — upload gambarnya di Pengaturan Global.";
     bgWrap.appendChild(note);
-    bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
   }
   advInner.appendChild(labeled("Background Gambar", bgWrap, "Global = ikut Pengaturan Global. Custom = gambar khusus slide ini."));
 
@@ -1135,7 +1152,16 @@ function setActiveCard(id, scroll) {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
+/* The sticky slide navigator sits right below the sticky header — measure the real
+ * header height (it varies with viewport/text wrap) into a CSS variable. */
+function syncHeaderHeight() {
+  const h = document.querySelector(".app-header");
+  const sticky = h && getComputedStyle(h).position === "sticky";
+  document.documentElement.style.setProperty("--header-h", (sticky ? h.offsetHeight : 0) + "px");
+}
+window.addEventListener("resize", syncHeaderHeight);
 function renderSlideNav() {
+  syncHeaderHeight();
   const nav = document.getElementById("slideNav");
   if (!nav) return;
   nav.innerHTML = "";
