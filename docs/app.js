@@ -1,7 +1,7 @@
-import { parseBrief } from "./import-brief.js?v=13";
-import { downloadPptx } from "./pptx-export.js?v=13";
-import * as store from "./storage.js?v=13";
-import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=13";
+import { parseBrief } from "./import-brief.js?v=14";
+import { downloadPptx } from "./pptx-export.js?v=14";
+import * as store from "./storage.js?v=14";
+import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=14";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -299,6 +299,7 @@ function newProject() {
 /* Warn (Save / Don't save / Cancel — two-step with native dialogs) before an action
  * that leaves unsaved manual changes behind. Returns true when it's ok to proceed. */
 async function confirmLeave() {
+  if (typeof generating !== "undefined" && generating) { alert("Tunggu proses generate selesai dulu."); return false; }
   if (!current.dirty) return true;
   await autosaveNow(); // recovery copy is always fresh
   if (confirm("Ada perubahan yang belum disimpan permanen (autosave aman).\n\nSimpan dulu sebagai project?")) {
@@ -335,7 +336,7 @@ async function refreshProjectPanel() {
   const t = (d) => d ? new Date(d).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-";
   const row = (m, actions) => {
     const div = document.createElement("div"); div.className = "proj-row";
-    const th = m.thumb ? `<img class="proj-thumb" src="${m.thumb}" alt="">` : '<div class="proj-thumb ph">🖼️</div>';
+    const th = m.thumb ? `<img class="proj-thumb" src="${m.thumb}" alt="">` : '<div class="proj-thumb ph"></div>';
     div.innerHTML = `${th}<div class="proj-info"><strong>${m.name || "Tanpa Judul"}</strong><span>${m.kind === "auto" ? "autosave " : "diubah "}${t(m.kind === "auto" ? m.autosavedAt : m.updatedAt)}</span></div><div class="proj-actions"></div>`;
     const act = div.querySelector(".proj-actions");
     actions.forEach(([label, fn, danger]) => {
@@ -486,8 +487,8 @@ function buildColorControl(obj, key, labelText, onChange, swatchTarget) {
     `<div class="cp-label">${labelText}</div>` +
     `<div class="cp-row"><input type="color" class="cp-pick"/><input type="text" class="cp-hex" maxlength="7" spellcheck="false"/>` +
     `<span class="cp-rgb">R<input type="number" class="cp-num r" min="0" max="255"> G<input type="number" class="cp-num g" min="0" max="255"> B<input type="number" class="cp-num b" min="0" max="255"></span>` +
-    `<button type="button" class="icon-btn cp-eye" title="Ambil warna dari layar">💧</button>` +
-    `<button type="button" class="icon-btn cp-fav" title="Simpan ke favorit">☆</button></div>`;
+    `<button type="button" class="link-btn cp-eye" title="Ambil warna dari layar">Pipet</button>` +
+    `<button type="button" class="link-btn cp-fav" title="Simpan warna ini ke favorit">+ Favorit</button></div>`;
   const pick = wrap.querySelector(".cp-pick"), hexIn = wrap.querySelector(".cp-hex");
   const rIn = wrap.querySelector(".r"), gIn = wrap.querySelector(".g"), bIn = wrap.querySelector(".b");
   const apply = (hex, from, commit) => {
@@ -585,9 +586,27 @@ function renderGlobalBgEditor() {
   host.innerHTML = "";
   host.appendChild(buildBgFillEditor(state.settings, () => { refreshAll(); markDirty(); }, { allowNone: true }));
   const applyAll = document.createElement("button");
-  applyAll.type = "button"; applyAll.className = "link-btn"; applyAll.textContent = "Terapkan ke semua slide (mode Global)";
+  applyAll.type = "button"; applyAll.className = "link-btn"; applyAll.textContent = "Terapkan warna ini ke semua slide";
   applyAll.addEventListener("click", () => { state.slides.forEach((s) => { s.bgColorMode = "global"; }); renderSlides(); });
   host.appendChild(applyAll);
+  // Global background IMAGE modes: apply to every slide, or release back to the
+  // theme default — a slide's own custom image is never deleted by switching.
+  const imgActions = document.getElementById("bgGlobalActions");
+  if (imgActions) {
+    imgActions.innerHTML = "";
+    const applyImg = document.createElement("button");
+    applyImg.type = "button"; applyImg.className = "link-btn"; applyImg.textContent = "Pakai gambar ini di semua slide";
+    applyImg.addEventListener("click", () => {
+      if (!state.bgImage) { alert("Upload dulu gambar background globalnya."); return; }
+      state.slides.forEach((s) => { s.bgMode = "global"; });
+      renderSlides();
+    });
+    const releaseImg = document.createElement("button");
+    releaseImg.type = "button"; releaseImg.className = "link-btn"; releaseImg.textContent = "Lepas dari semua slide";
+    releaseImg.title = "Kembali ke tampilan tema; gambar custom milik tiap slide tetap tersimpan";
+    releaseImg.addEventListener("click", () => { state.slides.forEach((s) => { if (s.bgMode === "global") s.bgMode = ""; }); renderSlides(); });
+    imgActions.appendChild(applyImg); imgActions.appendChild(releaseImg);
+  }
 }
 
 /* ---------------- Global settings ---------------- */
@@ -817,7 +836,7 @@ function colorField(slide, key, labelText) {
 }
 function buildImageDropzone(slide, key, onChange, subtitle) {
   const dz = document.createElement("div"); dz.className = "dropzone small";
-  dz.innerHTML = `<img class="thumb" style="display:none" /><div class="placeholder">➕</div><div class="info"><strong>Drag &amp; drop gambar</strong><span>${subtitle || "klik buat pilih file"}</span></div><div class="actions"><button type="button" class="link-btn danger" style="display:none">Hapus</button></div>`;
+  dz.innerHTML = `<img class="thumb" style="display:none" /><div class="placeholder">+</div><div class="info"><strong>Drag &amp; drop gambar</strong><span>${subtitle || "klik buat pilih file"}</span></div><div class="actions"><button type="button" class="link-btn danger" style="display:none">Hapus</button></div>`;
   const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.style.display = "none"; dz.appendChild(input);
   const thumb = dz.querySelector(".thumb"), placeholder = dz.querySelector(".placeholder"), removeBtn = dz.querySelector(".link-btn");
   function setImg(url) {
@@ -892,11 +911,15 @@ function buildSingleSlider(slide, key, text, min, max, def, unit) {
 }
 
 function buildCard(slide, idx) {
-  const card = document.createElement("div"); card.className = "slide-card"; card.dataset.id = slide.id;
+  const card = document.createElement("div"); card.className = "slide-card" + (slide.id === activeCardId ? "" : " collapsed"); card.dataset.id = slide.id;
   const top = document.createElement("div"); top.className = "slide-card-top";
-  top.innerHTML = `<span class="tag">Slide ${idx + 1}</span><div class="tools">
+  const typeLabel = (TYPES.find((t) => t.id === slide.type) || {}).label || slide.type;
+  const miniText = (slide.title || slide.capTop || slide.items || "").replace(/\*\*/g, "").split("\n")[0].slice(0, 48);
+  top.innerHTML = `<span class="tag">Slide ${idx + 1}</span><span class="mini">${typeLabel}${miniText ? " · " + miniText.replace(/</g, "&lt;") : ""}</span><div class="tools">
     <button class="icon-btn move-up" title="Naik">↑</button><button class="icon-btn move-down" title="Turun">↓</button>
     <button class="icon-btn dup" title="Duplikat">⧉</button><button class="icon-btn danger remove" title="Hapus">✕</button></div>`;
+  // Clicking the header expands this slide (accordion) — the tools keep working.
+  top.addEventListener("click", (e) => { if (e.target.closest(".tools")) return; setActiveCard(slide.id); });
   card.appendChild(top);
 
   const grid = document.createElement("div"); grid.className = "card-grid"; card.appendChild(grid);
@@ -905,17 +928,20 @@ function buildCard(slide, idx) {
   // Dropdowns must NEVER re-render the whole editor (that reloaded all 10 preview
   // iframes and looked like the app resetting — incl. right after Generate). A
   // layout/tone change rebuilds ONLY this card; theme/align just repaint the preview.
-  const headRow = document.createElement("div"); headRow.className = "opt-row";
+  const headRow = document.createElement("div"); headRow.className = "opt-row three";
   headRow.appendChild(labeled("Layout", dropdown(TYPES, slide.type, (id) => { slide.type = id; rebuildCard(slide); })));
   headRow.appendChild(labeled("Tema", dropdown(THEMES, slide.theme, (id) => { slide.theme = id; slide._send && slide._send(); })));
+  headRow.appendChild(labeled("Posisi Teks", dropdown(ALIGNS, slide.align, (id) => { slide.align = id; slide._send && slide._send(); })));
   col.appendChild(headRow);
 
-  const optRow = document.createElement("div"); optRow.className = "opt-row";
-  optRow.appendChild(labeled("Posisi Teks", dropdown(ALIGNS, slide.align, (id) => { slide.align = id; slide._send && slide._send(); })));
-  col.appendChild(optRow);
+  // Advanced appearance settings live in a collapsed group so a card stays compact;
+  // everything inside is unchanged functionally.
+  const adv = document.createElement("details"); adv.className = "adv";
+  adv.innerHTML = "<summary>Tampilan lanjutan — warna, texture &amp; background</summary>";
+  const advInner = document.createElement("div"); advInner.className = "inner"; adv.appendChild(advInner);
 
   const styleRow = document.createElement("div"); styleRow.className = "opt-row";
-  
+
   const texWrap = document.createElement("div");
   texWrap.appendChild(swatchChipRow(TEXTURES, slide.texture, (id) => { slide.texture = id; slide._send && slide._send(); }, "texture", slide.textureTone));
   // Light/Dark tone (independent of theme) + apply-to-all-slides
@@ -948,35 +974,35 @@ function buildCard(slide, idx) {
   patWrap.appendChild(patTools);
   patWrap.appendChild(buildTransformControls(slide, "pattern", ""));
   styleRow.appendChild(labeled("Garis / Pattern", patWrap));
-  
-  col.appendChild(styleRow);
+
+  advInner.appendChild(styleRow);
 
   const colorRow = document.createElement("div"); colorRow.className = "opt-row";
   colorRow.appendChild(colorField(slide, "titleColor", "Warna Judul"));
   colorRow.appendChild(colorField(slide, "textColor", "Warna Teks"));
-  col.appendChild(colorRow);
+  advInner.appendChild(colorRow);
   const colorRow2 = document.createElement("div"); colorRow2.className = "opt-row";
   colorRow2.appendChild(colorField(slide, "markColor", "Warna Stabilo"));
-  col.appendChild(colorRow2);
+  advInner.appendChild(colorRow2);
 
   // Background COLOUR per slide: theme default / global / custom override — with a
   // clear indicator of which source this slide is using.
   const bgcWrap = document.createElement("div");
-  const bgcModes = [{ id: "", label: "Tema (default)" }, { id: "global", label: "🌐 Global" }, { id: "custom", label: "🎨 Custom slide ini" }];
+  const bgcModes = [{ id: "", label: "Tema (default)" }, { id: "global", label: "Global" }, { id: "custom", label: "Custom slide ini" }];
   bgcWrap.appendChild(dropdown(bgcModes, slide.bgColorMode, (id) => { slide.bgColorMode = id; rebuildCard(slide); }));
   if (slide.bgColorMode === "global") {
     const note = document.createElement("div"); note.className = "field-hint";
     note.textContent = state.settings.bgFillType
-      ? "🌐 Slide ini pakai background warna GLOBAL (atur di Pengaturan Global)."
-      : "🌐 Mode Global aktif, tapi background global belum di-set di Pengaturan Global.";
+      ? "Slide ini memakai background warna global (diatur di Pengaturan Global)."
+      : "Mode global aktif, tapi background global belum diatur di Pengaturan Global.";
     bgcWrap.appendChild(note);
   } else if (slide.bgColorMode === "custom") {
     const note = document.createElement("div"); note.className = "field-hint";
-    note.textContent = "🎨 Slide ini pakai background warnanya SENDIRI (override global).";
+    note.textContent = "Slide ini memakai background warnanya sendiri (menimpa global).";
     bgcWrap.appendChild(note);
     bgcWrap.appendChild(buildBgFillEditor(slide, () => slide._send && slide._send()));
   }
-  col.appendChild(labeled("Warna Background", bgcWrap, "Solid / gradasi. Tema = gradasi bawaan tema."));
+  advInner.appendChild(labeled("Warna Background", bgcWrap, "Solid / gradasi. Tema = gradasi bawaan tema."));
 
   const topicInp = document.createElement("input"); topicInp.type = "text"; topicInp.value = slide.topic || ""; topicInp.placeholder = "mis. Realita — badge kanan atas";
   topicInp.addEventListener("input", () => { slide.topic = topicInp.value; slide._send && slide._send(); });
@@ -1028,23 +1054,29 @@ function buildCard(slide, idx) {
     capInput.style.marginTop = "8px";
     capInput.addEventListener("input", () => { slide.imageCaption = capInput.value; slide._send && slide._send(); });
     imgWrap.appendChild(capInput);
-    col.appendChild(labeled("Gambar (opsional)", imgWrap, "Muncul di dalam slide, dengan caption di bawahnya."));
+    advInner.appendChild(labeled("Gambar (opsional)", imgWrap, "Muncul di dalam slide, dengan caption di bawahnya."));
   }
 
-  // Background source: None / Global (from Pengaturan Global) / Custom (this slide).
-  // Works on any theme — an image background overlays the navy/light gradient.
+  // Background IMAGE source: none / global (inherits Pengaturan Global) / custom
+  // override for this slide only — switching modes keeps this slide's own image,
+  // so nothing is lost when toggling between global and custom.
   const bgWrap = document.createElement("div");
-  bgWrap.appendChild(dropdown(BG_MODES, slide.bgMode, (id) => { slide.bgMode = id; renderSlides(); }));
+  bgWrap.appendChild(dropdown(BG_MODES, slide.bgMode, (id) => { slide.bgMode = id; rebuildCard(slide); }));
   if (slide.bgMode === "custom") {
+    const note = document.createElement("div"); note.className = "field-hint";
+    note.textContent = "Slide ini memakai gambar background-nya sendiri (menimpa global).";
+    bgWrap.appendChild(note);
     bgWrap.appendChild(buildImageDropzone(slide, "bgImage", () => slide._send && slide._send(), "background khusus slide ini"));
     bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
   } else if (slide.bgMode === "global") {
     const note = document.createElement("div"); note.className = "field-hint";
-    note.textContent = state.bgImage ? "Pakai background global dari Pengaturan Global." : "Belum ada background global — upload di Pengaturan Global dulu.";
+    note.textContent = state.bgImage ? "Slide ini mengikuti background gambar global dari Pengaturan Global." : "Mode global aktif — upload gambarnya di Pengaturan Global.";
     bgWrap.appendChild(note);
     bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
   }
-  col.appendChild(labeled("Background", bgWrap, "Global = ikut Pengaturan Global. Custom = gambar khusus slide ini."));
+  advInner.appendChild(labeled("Background Gambar", bgWrap, "Global = ikut Pengaturan Global. Custom = gambar khusus slide ini."));
+
+  col.appendChild(adv);
 
   const prev = document.createElement("div"); prev.className = "preview-col";
   const frameWrap = document.createElement("div"); frameWrap.className = "preview-frame-wrap";
@@ -1054,8 +1086,11 @@ function buildCard(slide, idx) {
   grid.appendChild(prev);
 
   let ready = false;
-  function send() { 
+  function send() {
     if (ready) {
+      // A replaced card's iframe can linger in a closure for one tick — never let a
+      // stale frame throw (it would abort the refresh loop for the other slides).
+      if (!frame.isConnected || !frame.contentWindow) return;
       const w = 1080;
       let h = 1350;
       if (state.settings.ratio === "1:1") h = 1080;
@@ -1087,7 +1122,40 @@ function buildCard(slide, idx) {
 function moveSlide(id, dir) { const i = state.slides.findIndex((s) => s.id === id), j = i + dir; if (j < 0 || j >= state.slides.length) return; const [it] = state.slides.splice(i, 1); state.slides.splice(j, 0, it); renderSlides(); }
 function dupSlide(id) { const i = state.slides.findIndex((s) => s.id === id); const copy = freshSlide(Object.assign({}, state.slides[i], { id: undefined, _send: null })); copy.id = crypto.randomUUID(); state.slides.splice(i + 1, 0, copy); renderSlides(); }
 function removeSlide(id) { if (state.slides.length <= 1) { alert("Minimal 1 slide."); return; } state.slides = state.slides.filter((s) => s.id !== id); renderSlides(); }
-function renderSlides() { markDirty(); slidesListEl.innerHTML = ""; state.slides.forEach((s, i) => slidesListEl.appendChild(buildCard(s, i))); }
+/* Accordion: one slide expanded at a time; the rest collapse to a slim header.
+ * The navigator strip above the list jumps/highlights without re-rendering. */
+let activeCardId = null;
+function setActiveCard(id, scroll) {
+  activeCardId = id;
+  [...slidesListEl.children].forEach((c) => c.classList.toggle("collapsed", c.dataset.id !== id));
+  const nav = document.getElementById("slideNav");
+  if (nav) [...nav.children].forEach((ch) => ch.classList.toggle("active", ch.dataset.id === id));
+  if (scroll) {
+    const el = slidesListEl.querySelector('.slide-card[data-id="' + id + '"]');
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+function renderSlideNav() {
+  const nav = document.getElementById("slideNav");
+  if (!nav) return;
+  nav.innerHTML = "";
+  state.slides.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "nav-chip" + (s.id === activeCardId ? " active" : ""); b.dataset.id = s.id;
+    const tl = (TYPES.find((t) => t.id === s.type) || {}).label || s.type;
+    b.innerHTML = `<span class="n">${i + 1}</span>${tl}`;
+    b.title = (s.title || s.capTop || "").replace(/\*\*/g, "").slice(0, 80);
+    b.addEventListener("click", () => setActiveCard(s.id, true));
+    nav.appendChild(b);
+  });
+}
+function renderSlides() {
+  markDirty();
+  if (!state.slides.some((s) => s.id === activeCardId)) activeCardId = state.slides[0] && state.slides[0].id;
+  slidesListEl.innerHTML = "";
+  state.slides.forEach((s, i) => slidesListEl.appendChild(buildCard(s, i)));
+  renderSlideNav();
+}
 // Replace ONE card in place — dropdown changes must not rebuild the other cards
 // (that reloaded every preview iframe and looked like a full app reset).
 function rebuildCard(slide) {
@@ -1095,9 +1163,11 @@ function rebuildCard(slide) {
   const old = slidesListEl.querySelector('.slide-card[data-id="' + slide.id + '"]');
   if (idx < 0 || !old) { renderSlides(); return; }
   markDirty();
+  activeCardId = slide.id; // the card being edited stays the expanded one
   slidesListEl.replaceChild(buildCard(slide, idx), old);
+  renderSlideNav();
 }
-function refreshAll() { state.slides.forEach((s) => s._send && s._send()); }
+function refreshAll() { state.slides.forEach((s) => { try { s._send && s._send(); } catch (e) { console.warn("refresh slide gagal:", e); } }); }
 
 /* ---------------- Font selector (global) ---------------- */
 const fontRow = document.getElementById("fontRow");
@@ -1296,23 +1366,32 @@ async function renderPng(data) {
   pinLineBreaks(exportStage);     // freeze line breaks so the raster clone can't re-wrap
   return await stageToPng(w, h);
 }
+let generating = false;
 async function generatePng() {
   generateBtn.disabled = generateBtnTop.disabled = true;
-  statusMsg.className = "status-msg"; downloadZipBtn.style.display = "none"; gallerySection.style.display = "none";
+  generating = true;
+  statusMsg.className = "status-msg";
+  // Render into a TEMP array and commit to lastPngs only on full success — the
+  // existing gallery stays visible and intact throughout, so a failed run (or a
+  // subsequent autosave) can never wipe previously generated slides.
   try {
-    lastPngs = [];
+    const out = [];
     for (let i = 0; i < state.slides.length; i++) {
       statusMsg.textContent = `Render slide ${i + 1}/${state.slides.length}…`;
-      lastPngs.push(await renderPng(slideData(state.slides[i], i)));
+      out.push(await renderPng(slideData(state.slides[i], i)));
     }
+    lastPngs = out;
     renderGallery();
     gallerySection.scrollIntoView({ behavior: "smooth", block: "start" });
     statusMsg.textContent = `Selesai! ${lastPngs.length} PNG dibuat.`; statusMsg.className = "status-msg ok";
     // Generated results are part of the project: persist + refresh the thumbnail.
     await ensureThumb();
     markDirty();
-  } catch (err) { statusMsg.textContent = "Error: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
-  finally { generateBtn.disabled = generateBtnTop.disabled = false; }
+  } catch (err) {
+    statusMsg.textContent = "Error: " + err.message + " — hasil generate sebelumnya tetap utuh."; statusMsg.className = "status-msg error"; console.error(err);
+    renderGallery(); // old lastPngs untouched → old gallery stays
+  }
+  finally { generating = false; generateBtn.disabled = generateBtnTop.disabled = false; }
 }
 /* Gallery from lastPngs — also used to RESTORE generated results with a project. */
 function renderGallery() {
@@ -1831,13 +1910,13 @@ downloadPptxBtn.addEventListener("click", async () => {
     // Version + time in the filename so a fresh export can't be confused with an
     // older download of the same name sitting in the Downloads folder.
     const t = new Date();
-    const fname = `carousel-pastipintar-v13-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
+    const fname = `carousel-pastipintar-v14-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
     try {
       await downloadPptx(specs, fname);
     } catch (e) {
       throw new Error(`Gagal saat menyusun PPTX (PptxGenJS): ${e.stack || e.message}`);
     }
-    statusMsg.textContent = `PPTX selesai (build v13) → ${fname}. Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint).`; statusMsg.className = "status-msg ok";
+    statusMsg.textContent = `PPTX selesai (build v14) → ${fname}. Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint).`; statusMsg.className = "status-msg ok";
   } catch (err) { statusMsg.textContent = "Error PPTX: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
   finally { downloadPptxBtn.disabled = false; }
 });

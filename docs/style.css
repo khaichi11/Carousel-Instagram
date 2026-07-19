@@ -252,3 +252,74 @@ input[type="range"]:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(247,180
 .cp-swatches { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .cp-swlabel { font-size: 11.5px; color: var(--ink-soft, #667); }
 .cp-swatch { width: 22px; height: 22px; border-radius: 7px; border: 1px solid rgba(0,0,0,0.18); cursor: pointer; padding: 0; }
+
+/* ===== v14 — professional-editor polish ===== */
+/* Harmonize the newer sections with the design tokens (no stray gray borders). */
+.proj-row, .tpl-card { border-color: var(--border); }
+.proj-info span, .tpl-card > span, .cp-label, .cp-rgb, .cp-swlabel { color: var(--text-soft); }
+.project-lists h3 { color: var(--text-soft); }
+.input-tab { border: 1.5px solid var(--border); }
+.brief-editor { border: 1.5px solid var(--border); }
+.brief-editor:focus { outline: none; border-color: var(--gold); }
+.cp-pick, .cp-hex, .cp-num, .cp-swatch { border-color: var(--border); }
+.cp-eye, .cp-fav { font-size: 12px; padding: 4px 6px; }
+
+/* Slide navigator: jump between slides; active one highlighted. */
+.slide-nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.nav-chip {
+  border: 1.5px solid var(--border); background: #fff; color: var(--text-soft);
+  border-radius: 999px; padding: 6px 12px 6px 6px; font-family: inherit; font-weight: 700;
+  font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+}
+.nav-chip .n {
+  width: 22px; height: 22px; border-radius: 50%; background: #EDEDFA; color: var(--navy);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px;
+}
+.nav-chip:hover { border-color: var(--gold); }
+.nav-chip.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.nav-chip.active .n { background: var(--gold); color: var(--navy-deep); }
+
+/* Accordion cards: one expanded, others collapse to a slim header. */
+.slide-card { background: #fff; }
+.slide-card-top { cursor: pointer; user-select: none; }
+.slide-card-top .mini { display: none; font-size: 13px; color: var(--text-soft); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 12px; }
+.slide-card.collapsed { padding: 12px 18px; }
+.slide-card.collapsed .slide-card-top { margin-bottom: 0; }
+.slide-card.collapsed .card-grid { display: none; }
+.slide-card.collapsed .mini { display: block; }
+.slide-card:not(.collapsed) { border-color: var(--gold); box-shadow: 0 10px 30px rgba(247, 180, 0, 0.10); }
+
+/* Collapsible advanced-settings groups. */
+details.adv { border: 1.5px solid var(--border); border-radius: 12px; padding: 0 14px; margin: 4px 0 14px; background: #fff; }
+details.adv summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 9px;
+  padding: 12px 2px; font-size: 12px; font-weight: 700; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+details.adv summary::-webkit-details-marker { display: none; }
+details.adv summary::before {
+  content: ""; width: 7px; height: 7px; flex: 0 0 auto;
+  border-right: 2px solid var(--text-soft); border-bottom: 2px solid var(--text-soft);
+  transform: rotate(-45deg); transition: transform 0.15s ease; margin-left: 2px;
+}
+details.adv[open] summary::before { transform: rotate(45deg); }
+details.adv .inner { padding: 2px 2px 14px; }
+
+/* Neutral SVG placeholder icons (no emojis in the chrome). */
+#bgPlaceholder, .proj-thumb.ph {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236B6D91' stroke-width='1.7'><rect x='3' y='3' width='18' height='18' rx='3'/><circle cx='8.5' cy='8.5' r='1.6'/><path d='M21 15l-5-5-9 9'/></svg>");
+  background-repeat: no-repeat; background-position: center;
+}
+#importIcon {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236B6D91' stroke-width='1.7'><path d='M6 2h8l4 4v16H6z'/><path d='M14 2v5h5'/><path d='M9 13h6M9 17h6'/></svg>");
+  background-repeat: no-repeat; background-position: center;
+}
+.dropzone .placeholder { font-weight: 600; }
+
+@media (max-width: 860px) {
+  .project-bar { max-width: 160px; }
+  .header-actions { flex-wrap: wrap; gap: 6px; }
+  .tpl-grid { grid-template-columns: 1fr 1fr; }
+  .opt-row.three { grid-template-columns: 1fr; }
+}
+.opt-row.three { grid-template-columns: 1fr 1fr 1fr; }

@@ -6,8 +6,8 @@
 <title>Pasti Pintar — Carousel Studio</title>
 <link rel="icon" href="logo/logo.png" />
 <link rel="stylesheet" href="fonts.css" />
-<link rel="stylesheet" href="stage.css?v=13" />
-<link rel="stylesheet" href="style.css?v=13" />
+<link rel="stylesheet" href="stage.css?v=14" />
+<link rel="stylesheet" href="style.css?v=14" />
 </head>
 <body class="stage-scope">
 
@@ -24,10 +24,9 @@
       <span class="project-name" id="projectName">Tanpa Judul</span>
       <span class="save-badge" id="saveBadge"></span>
     </div>
-    <button class="btn btn-ghost" id="projectsBtn">📁 Proyek</button>
-    <button class="btn btn-ghost" id="saveBtn">💾 Simpan</button>
+    <button class="btn btn-ghost" id="projectsBtn">Proyek</button>
+    <button class="btn btn-ghost" id="saveBtn">Simpan</button>
     <button class="btn btn-ghost" id="saveAsBtn">Simpan Sebagai…</button>
-    <button class="btn btn-ghost" id="resetBtn">Reset Draft</button>
     <button class="btn btn-primary" id="generateBtnTop">Generate</button>
   </div>
 </header>
@@ -41,8 +40,9 @@
         <p class="hint">Semua tersimpan <b>offline di browser ini</b> (IndexedDB) — tanpa akun, tanpa server. Autosave = file pemulihan sementara (maks. 3); tombol <b>Simpan</b> membuat project permanen.</p>
       </div>
       <div class="chip-row">
-        <button class="btn btn-ghost" id="newProjectBtn">✚ Proyek Baru</button>
+        <button class="btn btn-ghost" id="newProjectBtn">+ Proyek Baru</button>
         <button class="btn btn-ghost" id="projectImportBtn">Import Project (.json)</button>
+        <button class="btn btn-ghost" id="resetBtn">Reset Draft</button>
         <input type="file" id="projectImportInput" accept=".json,application/json" style="display:none" />
       </div>
     </div>
@@ -55,8 +55,8 @@
       <button class="link-btn inline" id="showExampleBtn">Lihat contoh format</button> ·
       <a class="link-btn inline" href="contoh-brief.txt" download>Download contoh (.txt)</a></p>
     <div class="input-tabs">
-      <button type="button" class="input-tab active" data-mode="text">✍️ Tulis / Tempel Teks</button>
-      <button type="button" class="input-tab" data-mode="file">📄 Import File (.txt / .md / .pdf)</button>
+      <button type="button" class="input-tab active" data-mode="text">Tulis / Tempel Teks</button>
+      <button type="button" class="input-tab" data-mode="file">Import File (.txt / .md / .pdf)</button>
     </div>
     <div id="inputTextPane">
       <textarea id="briefEditor" class="brief-editor" spellcheck="false" placeholder="Tulis atau tempel naskah carousel-mu di sini…&#10;&#10;=== Slide ===&#10;judul: Judul slide pertama — **kata** jadi stabilo&#10;sub: Kalimat pendukung&#10;&#10;=== Slide ===&#10;judul: Slide kedua&#10;- poin satu&#10;- poin dua"></textarea>
@@ -68,7 +68,7 @@
     </div>
     <div id="inputFilePane" style="display:none">
       <div class="dropzone" id="importDropzone">
-        <div class="placeholder" id="importIcon">📄</div>
+        <div class="placeholder" id="importIcon"></div>
         <div class="info">
           <strong>Drag &amp; drop file brief</strong>
           <span id="importSub">.pdf / .txt / .md (UTF-8) — klik buat pilih file. Isinya dimuat ke editor teks dulu, jadi tetap bisa diedit.</span>
@@ -112,31 +112,14 @@
 
   <section class="panel">
     <h2>Pengaturan Global</h2>
-    <p class="hint">Background global bisa dipakai di slide mana pun (pilih <b>Background → Global</b> di slide). Handle IG &amp; website muncul di footer tiap slide.</p>
+    <p class="hint">Identitas footer dan ukuran berlaku untuk semua slide. Background dan font ada di grup di bawahnya.</p>
     <div class="settings-grid">
-      <div>
-        <div class="dropzone" id="bgDropzone">
-          <img class="thumb" id="bgThumb" style="display:none" />
-          <div class="placeholder" id="bgPlaceholder">🖼️</div>
-          <div class="info"><strong>Background global</strong><span>drag &amp; drop / klik — JPG/PNG</span></div>
-          <div class="actions"><button type="button" class="link-btn danger" id="bgRemoveBtn" style="display:none">Hapus</button></div>
-        </div>
-        <input type="file" accept="image/*" id="bgFileInput" style="display:none" />
-      </div>
       <div class="settings-fields">
         <label>Handle Instagram</label>
         <input type="text" id="igInput" placeholder="pastipintar" />
         <label>Website</label>
         <input type="text" id="webInput" placeholder="pastipintar.id" />
       </div>
-      </div>
-    </div>
-    <div class="field" style="margin-top:16px">
-      <label>Background Warna / Gradasi (Global)</label>
-      <div id="globalBgFill"></div>
-      <span class="field-hint">Dipakai oleh slide yang "Warna Background"-nya di-set <b>🌐 Global</b>. Slide dengan mode <b>🎨 Custom</b> tetap pakai warnanya sendiri.</span>
-    </div>
-    <div class="settings-grid" style="margin-top:16px">
       <div class="field">
         <label>Ukuran / Aspek Rasio</label>
         <select class="select-input" id="ratioSelect">
@@ -147,23 +130,46 @@
         </select>
       </div>
     </div>
-    <div class="field" style="margin-top:16px">
-      <label>Font Judul <span style="font-weight:500;text-transform:none;letter-spacing:0">— semua gratis (Open Font License)</span></label>
-      <div class="chip-row" id="fontRow"></div>
-      <div style="margin-top:8px">
-        <label style="font-size:12px;color:var(--ink-soft)">Atau Paste Link Google Fonts:</label>
-        <input type="text" id="customFontInput" placeholder="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" style="width:100%;margin-top:4px" />
+
+    <details class="adv">
+      <summary>Background global — gambar &amp; warna</summary>
+      <div class="inner">
+        <p class="hint">Background global dipakai oleh slide yang mode background-nya <b>Global</b>; slide bermode <b>Custom</b> tetap memakai miliknya sendiri. Berpindah mode tidak menghapus pengaturan mana pun.</p>
+        <div class="dropzone" id="bgDropzone">
+          <img class="thumb" id="bgThumb" style="display:none" />
+          <div class="placeholder" id="bgPlaceholder"></div>
+          <div class="info"><strong>Gambar background global</strong><span>drag &amp; drop / klik — JPG/PNG</span></div>
+          <div class="actions"><button type="button" class="link-btn danger" id="bgRemoveBtn" style="display:none">Hapus</button></div>
+        </div>
+        <input type="file" accept="image/*" id="bgFileInput" style="display:none" />
+        <div class="chip-row" id="bgGlobalActions" style="margin-top:8px"></div>
+        <div class="field" style="margin-top:14px">
+          <label>Warna / gradasi global</label>
+          <div id="globalBgFill"></div>
+        </div>
       </div>
-    </div>
+    </details>
+
+    <details class="adv">
+      <summary>Font judul</summary>
+      <div class="inner">
+        <div class="chip-row" id="fontRow"></div>
+        <div style="margin-top:10px">
+          <label style="font-size:12px;color:var(--text-soft)">Atau paste link Google Fonts:</label>
+          <input type="text" id="customFontInput" placeholder="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" style="width:100%;margin-top:4px" />
+        </div>
+      </div>
+    </details>
   </section>
 
   <section class="panel">
     <div class="slides-head">
       <div>
         <h2>Slide</h2>
-        <p class="hint">Tiap slide bisa beda layout, tema, warna, texture &amp; garis. Highlight pakai <code>**kata**</code>.</p>
+        <p class="hint">Klik nomor untuk pindah slide — satu slide terbuka penuh, sisanya ringkas. Highlight pakai <code>**kata**</code>.</p>
       </div>
     </div>
+    <div class="slide-nav" id="slideNav"></div>
     <div class="slides-list" id="slidesList"></div>
     <div class="add-slide-row">
       <button class="btn btn-ghost" id="addSlideBtn">+ Tambah Slide</button>
@@ -190,11 +196,11 @@
   <div class="stage" id="exportStage"></div>
 </div>
 
-<script src="textures.js?v=13"></script>
-<script src="stage.js?v=13"></script>
+<script src="textures.js?v=14"></script>
+<script src="stage.js?v=14"></script>
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=13"></script>
+<script type="module" src="app.js?v=14"></script>
 </body>
 </html>
