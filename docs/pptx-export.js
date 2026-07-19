@@ -50,7 +50,11 @@ export async function downloadPptx(specs, fileName) {
     (spec.images || []).forEach((img) => {
       const x = Number(img.x), y = Number(img.y), w = Number(img.w), h = Number(img.h);
       if (!img.src || ![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
-      s.addImage({ data: img.src, x: x * PX, y: y * PX, w: w * PX, h: h * PX });
+      const o = { data: img.src, x: x * PX, y: y * PX, w: w * PX, h: h * PX };
+      if (img.rotate) o.rotate = normRot(img.rotate);
+      if (img.flipH) o.flipH = true;
+      if (img.transparency) o.transparency = Math.max(0, Math.min(100, img.transparency));
+      s.addImage(o);
     });
 
     // 4. editable text boxes (one per text element), with run-level stabilo highlight

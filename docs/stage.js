@@ -112,7 +112,46 @@
     if (d.button) wrap.appendChild(el("div", "pill-btn", esc(d.button)));
   }
 
-  var BUILDERS = { cover: buildCover, highlight: buildHighlight, list: buildList, table: buildTable, compare: buildCompare, meme: buildMeme, cta: buildCta };
+  // Layout "figure": text beside a transparent-PNG person (kiri/kanan), with
+  // scale/pos/rotate/flip/opacity + layer order. Falls back to a silhouette
+  // placeholder until the user uploads their own PNG.
+  var FIGURE_PLACEHOLDER =
+    '<svg class="figure-img fig-ph" viewBox="0 0 220 400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<circle cx="110" cy="64" r="42" fill="currentColor"/>' +
+    '<path d="M110 118c-50 0-78 36-83 86l-7 196h180l-7-196c-5-50-33-86-83-86z" fill="currentColor"/>' +
+    '<path d="M158 150l46 52-14 13-40-38z" fill="currentColor"/>' +
+    "</svg>";
+  function buildFigure(d, wrap) {
+    wrap.style.flexDirection = "row";
+    wrap.style.flex = "1";
+    wrap.classList.add(d.figureSide === "left" ? "side-left" : "side-right");
+    var txt = el("div", "fig-text");
+    if (d.eyebrow) txt.appendChild(el("div", "eyebrow", esc(d.eyebrow)));
+    if (d.title) txt.appendChild(el("h1", "display", inline(d.title, true)));
+    if (d.subtitle) txt.appendChild(el("div", "subtitle", inline(d.subtitle, true)));
+    if (d.button) txt.appendChild(el("div", "pill-btn", esc(d.button)));
+    var col = el("div", "fig-col");
+    if (d.figureLayer === "front") col.style.zIndex = "4";
+    var sc = (d.figScale || 100) / 100;
+    var t = "translate(" + ((d.figX || 50) - 50) + "%, " + ((d.figY || 50) - 50) + "%) rotate(" + (d.figRotate || 0) + "deg) scale(" + sc * (d.figFlip ? -1 : 1) + ", " + sc + ")";
+    var op = (d.figOpacity == null ? 100 : d.figOpacity) / 100;
+    var fig;
+    if (d.figureImage) {
+      fig = document.createElement("img");
+      fig.className = "figure-img"; fig.alt = "";
+      fig.src = d.figureImage;
+    } else {
+      col.innerHTML = FIGURE_PLACEHOLDER;
+      fig = col.querySelector("svg");
+    }
+    fig.style.transform = t;
+    fig.style.opacity = op;
+    if (d.figureImage) col.appendChild(fig);
+    if (d.figureSide === "left") { wrap.appendChild(col); wrap.appendChild(txt); }
+    else { wrap.appendChild(txt); wrap.appendChild(col); }
+  }
+
+  var BUILDERS = { cover: buildCover, highlight: buildHighlight, list: buildList, table: buildTable, compare: buildCompare, meme: buildMeme, cta: buildCta, figure: buildFigure };
 
   function renderStage(stage, d) {
     d = d || {};
@@ -168,6 +207,11 @@
       photoImg.style.transform = "scale(" + ((d.bgZoom || 100) / 100) + ")";
       stage.querySelector(".bg-photo").appendChild(photoImg);
     }
+
+    // Custom background fill (solid / linear / radial), global or per-slide — an
+    // inline style so it wins over the theme gradient. A background IMAGE still
+    // covers it (has-bg forces the gradient off).
+    if (d.bgFill) stage.querySelector(".bg-gradient").style.background = d.bgFill;
     
     var pattern = stage.querySelector(".bg-pattern");
     if (d.pattern) {
@@ -201,7 +245,7 @@
     wrap.style.display = "flex";
     wrap.style.flexDirection = "column";
     wrap.style.width = "100%";
-    if (type === "compare") { wrap.style.flex = "1"; body.style.justifyContent = "stretch"; }
+    if (type === "compare" || type === "figure") { wrap.style.flex = "1"; body.style.justifyContent = "stretch"; }
     var usesCard = !!d.bgImage && (type === "cover" || type === "highlight" || type === "cta");
     if (usesCard) wrap.classList.add("text-card");
     BUILDERS[type](d, wrap);
@@ -224,9 +268,15 @@
 
     // Handle text sits in its own .ht span so the PPTX export can grab it separately
     // from the .ic chip (otherwise "IG"/"@" got duplicated into the handle text box).
+    // The IG chip shows the Instagram camera glyph (simple outline shapes, freely
+    // reproducible) instead of the letters "IG"; the "@" chip is optically centred.
+    var IG_ICON =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5"/><circle cx="12" cy="12" r="4.5"/>' +
+      '<circle cx="17.2" cy="6.8" r="1.3" fill="currentColor" stroke="none"/></svg>';
     var handles = stage.querySelector(".handles");
-    if (d.igHandle) handles.appendChild(el("span", "h", '<span class="ic">IG</span><span class="ht">' + esc(d.igHandle) + "</span>"));
-    if (d.website) handles.appendChild(el("span", "h", '<span class="ic">@</span><span class="ht">' + esc(d.website) + "</span>"));
+    if (d.igHandle) handles.appendChild(el("span", "h", '<span class="ic ic-ig">' + IG_ICON + '</span><span class="ht">' + esc(d.igHandle) + "</span>"));
+    if (d.website) handles.appendChild(el("span", "h", '<span class="ic ic-at">@</span><span class="ht">' + esc(d.website) + "</span>"));
 
     fitStage(stage);
   }

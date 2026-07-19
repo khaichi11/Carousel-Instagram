@@ -153,6 +153,9 @@
 .stage .handles { display: flex; align-items: center; gap: 22px; font-weight: 800; font-size: 30px; opacity: 0.96; }
 .stage .handles .h { display: flex; align-items: center; gap: 10px; }
 .stage .handles .ic { width: 38px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 800; background: var(--gold); color: var(--navy-deep); }
+.stage .handles .ic svg { width: 24px; height: 24px; display: block; }
+/* "@" optical centring: the glyph's em-box sits low — nudge it so it reads centred. */
+.stage .handles .ic-at { font-size: 23px; line-height: 1; padding-bottom: 2px; }
 .stage[data-theme="light"] .handles { color: var(--navy); }
 
 /* ---------- Body ---------- */
@@ -240,6 +243,8 @@
 }
 .stage.pptx-bg .meme-frame img { opacity: 0 !important; }
 .stage.pptx-bg .logo-chip img { opacity: 0 !important; }
+.stage.pptx-bg img.figure-img { opacity: 0 !important; }
+.stage.pptx-bg .handles .ic svg { opacity: 0 !important; }
 
 /* optional per-slide text color override (only for text sitting on the background) */
 .stage.has-text-color .display,
@@ -314,6 +319,15 @@
 .stage .cmp-item:last-child { border-bottom: none; }
 .stage .cmp-ic { flex: 0 0 auto; font-size: 30px; line-height: 1.1; }
 .stage .cmp-tx { min-width: 0; word-break: break-word; }
+
+/* figure (human beside content) */
+.stage .l-figure { align-items: stretch; gap: 30px; min-height: 0; }
+.stage .l-figure .fig-text { flex: 1 1 58%; min-width: 0; display: flex; flex-direction: column; justify-content: center; z-index: 2; }
+.stage .l-figure .fig-col { flex: 0 0 38%; position: relative; display: flex; align-items: flex-end; justify-content: center; min-height: 0; }
+.stage .l-figure .display { font-size: 74px; }
+.stage .l-figure .figure-img { max-width: 100%; max-height: 100%; object-fit: contain; object-position: bottom center; display: block; transform-origin: bottom center; }
+.stage .l-figure svg.fig-ph { width: 78%; height: auto; color: rgba(255,255,255,0.22); }
+.stage[data-theme="light"] .l-figure svg.fig-ph { color: rgba(47,49,139,0.18); }
 
 /* photo theme frosted text card */
 .stage[data-theme="photo"] .text-card { background: rgba(255,255,255,0.96); color: var(--ink); border-radius: 30px; padding: 40px 42px; box-shadow: 0 26px 70px rgba(0,0,0,0.5); }

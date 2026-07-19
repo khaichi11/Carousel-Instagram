@@ -4,7 +4,10 @@ Web app buat bikin carousel IG/TikTok yang **modern & rapi** dari naskah.
 Output bisa **PNG** (siap upload) atau **PPTX** (semua elemen editable di Canva/PowerPoint).
 
 ## Fitur Utama
-- **7 layout**: Cover, Highlight (stabilo), List, Tabel/Ranking, Komparasi, Meme, CTA.
+- **8 layout**: Cover, Highlight (stabilo), List, Tabel/Ranking, Komparasi, Meme, Figur (orang PNG transparan di samping teks), CTA.
+- **Project tersimpan otomatis (offline)**: semua kerjaan — slide, upload, warna, hasil PNG — disimpan di browser (IndexedDB) tanpa akun/server. Autosave tiap beberapa detik (maks. 3 file pemulihan), tombol **Simpan / Simpan Sebagai** untuk project permanen, plus rename/duplikat/hapus/export/import project (.json). Asset di-dedup pakai hash biar hemat storage.
+- **Template Edukasi**: koleksi preset siap pakai (UTBK, mata pelajaran, persiapan ujian, bimbel/promo, infografis belajar, flashcard, kuis, motivasi, progress tracker) — tambahan, semua layout lama tetap ada.
+- **Background bebas**: warna solid / gradasi linear / radial per slide atau global, dengan color picker lengkap (HEX, RGB, eyedropper, warna terakhir & favorit).
 - **Dukungan Aspek Rasio**: 1:1, 4:5, 3:4, 9:16.
 - **Customisasi Mendalam**: posisi teks, warna, texture (bisa digeser & di-scale), pattern, dan background gambar (pan/crop).
 - **Custom Font**: Bisa paste link dari Google Fonts langsung di web.

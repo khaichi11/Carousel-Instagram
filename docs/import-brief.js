@@ -30,7 +30,7 @@
  *     emoji lines become list items; plain lines become title + subtitle.
  */
 
-const VALID_TYPES = ["cover", "highlight", "list", "table", "compare", "meme", "cta"];
+const VALID_TYPES = ["cover", "highlight", "list", "table", "compare", "meme", "figure", "cta"];
 const VALID_THEMES = ["dark", "light", "photo"];
 const VALID_ALIGNS = ["", "top", "center", "bottom"];
 

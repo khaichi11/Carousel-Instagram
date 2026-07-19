@@ -4,7 +4,8 @@
 // otomatis dari isinya (poin -> list/tabel, dua kolom -> komparasi, dst).
 //
 // ARTI TIAP FIELD:
-// layout  : cover | highlight | list | table | compare | meme | cta
+// layout  : cover | highlight | list | table | compare | meme | figure | cta
+//           (figure = teks di samping figur orang PNG transparan)
 // theme   : dark (navy) | light (terang)
 // align   : top | center | bottom — posisi vertikal teks
 // topik   : teks badge pil kuning di POJOK KANAN ATAS slide

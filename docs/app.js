@@ -1,5 +1,7 @@
-import { parseBrief } from "./import-brief.js?v=11";
-import { downloadPptx } from "./pptx-export.js?v=11";
+import { parseBrief } from "./import-brief.js?v=13";
+import { downloadPptx } from "./pptx-export.js?v=13";
+import * as store from "./storage.js?v=13";
+import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=13";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -11,8 +13,11 @@ const TYPES = [
   { id: "table", label: "Tabel" },
   { id: "compare", label: "Komparasi" },
   { id: "meme", label: "Meme" },
+  { id: "figure", label: "Figur (Orang)" },
   { id: "cta", label: "CTA" },
 ];
+const FIGURE_SIDES = [{ id: "right", label: "Kanan" }, { id: "left", label: "Kiri" }];
+const FIGURE_LAYERS = [{ id: "back", label: "Di belakang teks" }, { id: "front", label: "Di depan teks" }];
 const THEMES = [{ id: "dark", label: "Navy" }, { id: "light", label: "Terang" }];
 // Background source per design — decoupled from the light/dark theme so any slide can
 // show a background image (global from settings, or a custom one for this slide).
@@ -65,6 +70,13 @@ const TYPE_FIELDS = {
     { key: "subtitle", label: "Subjudul (opsional)", kind: "textarea", rows: 2, ph: "Kenali dirimu. Siapkan strategimu." },
     { key: "button", label: "Tombol (opsional)", kind: "text", ph: 'Komen "JOIN" 👇' },
   ],
+  figure: [
+    { key: "eyebrow", label: "Label kecil (opsional)", kind: "text", ph: "WAJIB TAHU" },
+    { key: "title", label: "Judul", kind: "textarea", rows: 2, ph: "Judul di samping figur — **kata** jadi highlight" },
+    { key: "subtitle", label: "Subjudul (opsional)", kind: "textarea", rows: 2, ph: "Kalimat pendukung" },
+    { key: "button", label: "Tombol (opsional)", kind: "text", ph: "" },
+    { key: "figureImage", label: "Gambar Orang (PNG transparan)", kind: "figure", hint: "Upload PNG transparan (guru, murid, presenter…). Tanpa upload, tampil siluet placeholder." },
+  ],
 };
 
 /* ---------------- Default deck (Pasti Pintar brief, corrected) ---------------- */
@@ -90,12 +102,20 @@ function freshSlide(base) {
     { id: crypto.randomUUID(), type: "cover", theme: "dark", align: "", topic: "", eyebrow: "", title: "", subtitle: "", button: "",
       items: "", colA: "", itemsA: "", colB: "", itemsB: "", capTop: "", capBottom: "",
       textColor: "", titleColor: "", markColor: "", texture: "", textureTone: "light", textureOpacity: 60, pattern: "", image: null, imageCaption: "", bgImage: null, bgMode: "",
+      bgColorMode: "", bgFillType: "solid", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
+      figureImage: null, figureSide: "right", figureLayer: "back", figX: 50, figY: 50, figScale: 100, figRotate: 0, figFlip: false, figOpacity: 100,
       imgX: 50, imgY: 50, imgZoom: 100,
       bgX: 50, bgY: 50, bgZoom: 100, textureX: 50, textureY: 50, textureScale: 100, patternX: 50, patternY: 50, patternScale: 100, _send: null },
     base
   );
 }
-const state = { bgImage: null, settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5" }, slides: DEFAULT_SLIDES.map(freshSlide) };
+const state = {
+  bgImage: null,
+  briefText: "",
+  settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5",
+    bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155 },
+  slides: DEFAULT_SLIDES.map(freshSlide),
+};
 
 let LOGO_DATAURL = "logo/logo.png";
 
@@ -126,9 +146,309 @@ function wireDropzone(zone, input, onFile) {
 }
 function downloadBlob(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 
+/* ================= Persistence & project management =================
+ * Everything lives in IndexedDB (storage.js): autosaves are recovery rows capped at
+ * 3, manual Save/Save As create permanent projects. The whole editor state — slides
+ * (incl. uploads as data-URLs), settings, brief text, generated PNGs — round-trips
+ * through snapshot()/applyProject(). */
+const current = {
+  savedId: null,             // id of the permanent project this session belongs to (null = never saved)
+  draftId: store.newId("d"), // identity of this editing session for its autosave row
+  name: "Tanpa Judul",
+  createdAt: Date.now(),
+  thumb: null,
+  dirty: false,              // unsaved vs MANUAL save
+  lastAuto: null, lastManual: null,
+};
+let restoring = false;       // suppress dirty-marking while a project is being applied
+let autoTimer = null;
+let storageWarned = false;
+
+function snapshot() {
+  return {
+    settings: Object.assign({}, state.settings),
+    bgImage: state.bgImage,
+    briefText: state.briefText,
+    slides: state.slides.map((s) => { const c = Object.assign({}, s); delete c._send; return c; }),
+    pngs: lastPngs.slice(),
+  };
+}
+function autoMeta() {
+  return {
+    id: "auto_" + (current.savedId || current.draftId), kind: "auto",
+    of: current.savedId, name: current.name,
+    createdAt: current.createdAt, updatedAt: Date.now(), autosavedAt: Date.now(),
+    thumb: current.thumb, appVersion: 13,
+  };
+}
+function updateSaveBadge() {
+  const b = document.getElementById("saveBadge");
+  if (!b) return;
+  const t = (d) => d ? new Date(d).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "";
+  if (current.dirty) {
+    b.textContent = current.lastAuto ? `• Belum disimpan — autosave ${t(current.lastAuto)}` : "• Belum disimpan";
+    b.className = "save-badge dirty";
+  } else if (current.lastManual) {
+    b.textContent = `✓ Tersimpan ${t(current.lastManual)}`;
+    b.className = "save-badge ok";
+  } else {
+    b.textContent = current.lastAuto ? `✓ Autosave ${t(current.lastAuto)}` : "";
+    b.className = "save-badge ok";
+  }
+  const nameEl = document.getElementById("projectName");
+  if (nameEl) nameEl.textContent = current.name + (current.dirty ? " •" : "");
+}
+function markDirty() {
+  if (restoring) return;
+  current.dirty = true;
+  updateSaveBadge();
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(autosaveNow, 1500); // autosave shortly after the last edit
+}
+async function autosaveNow() {
+  clearTimeout(autoTimer);
+  try {
+    await store.saveProject(autoMeta(), snapshot());
+    current.lastAuto = Date.now();
+    updateSaveBadge();
+    checkStorage();
+  } catch (e) { console.warn("Autosave gagal:", e); }
+}
+setInterval(() => { if (current.dirty) autosaveNow(); }, 15000); // safety-net interval
+
+async function manualSave(asNew) {
+  let name = current.name;
+  if (asNew || !current.savedId) {
+    name = prompt("Nama project:", asNew && current.savedId ? current.name + " (salinan)" : current.name);
+    if (name == null) return false;
+    name = name.trim() || "Tanpa Judul";
+  }
+  const id = (asNew || !current.savedId) ? store.newId("p") : current.savedId;
+  const createdAt = (asNew || !current.savedId) ? Date.now() : current.createdAt;
+  await ensureThumb();
+  await store.saveProject({
+    id, kind: "saved", name, createdAt, updatedAt: Date.now(),
+    autosavedAt: current.lastAuto, thumb: current.thumb, appVersion: 13,
+  }, snapshot());
+  // the old draft's autosave row now belongs to the saved id
+  if (!current.savedId || asNew) await store.deleteProject("auto_" + (current.savedId || current.draftId)).catch(() => {});
+  current.savedId = id; current.name = name; current.createdAt = createdAt;
+  current.dirty = false; current.lastManual = Date.now();
+  updateSaveBadge();
+  refreshProjectPanel();
+  store.sweepAssets().catch(() => {});
+  return true;
+}
+
+/* Thumbnail: reuse the first generated PNG (downscaled); never renders extra. */
+function ensureThumb() {
+  return new Promise((res) => {
+    if (!lastPngs.length) return res();
+    const img = new Image();
+    img.onload = () => {
+      const w = 180, h = Math.round(w * img.height / img.width);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      current.thumb = c.toDataURL("image/jpeg", 0.7);
+      res();
+    };
+    img.onerror = () => res();
+    img.src = lastPngs[0];
+  });
+}
+
+function applyProject(meta, content) {
+  restoring = true;
+  try {
+    current.savedId = meta.kind === "saved" ? meta.id : (meta.of || null);
+    current.draftId = meta.kind === "auto" ? meta.id.replace(/^auto_/, "") : store.newId("d");
+    current.name = meta.name || "Tanpa Judul";
+    current.createdAt = meta.createdAt || Date.now();
+    current.thumb = meta.thumb || null;
+    current.dirty = false;
+    current.lastAuto = meta.autosavedAt || null;
+    current.lastManual = meta.kind === "saved" ? meta.updatedAt : null;
+    Object.assign(state.settings, content.settings || {});
+    state.bgImage = content.bgImage || null;
+    state.briefText = content.briefText || "";
+    state.slides = (content.slides && content.slides.length ? content.slides : DEFAULT_SLIDES).map(freshSlide);
+    lastPngs = (content.pngs || []).filter(Boolean);
+    syncGlobalInputs();
+    renderSlides();
+    renderGallery();
+  } finally { restoring = false; }
+  updateSaveBadge();
+}
+function newProject() {
+  restoring = true;
+  try {
+    current.savedId = null; current.draftId = store.newId("d");
+    current.name = "Tanpa Judul"; current.createdAt = Date.now();
+    current.thumb = null; current.dirty = false; current.lastAuto = null; current.lastManual = null;
+    state.bgImage = null; state.briefText = "";
+    Object.assign(state.settings, { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155 });
+    state.slides = DEFAULT_SLIDES.map(freshSlide);
+    lastPngs = [];
+    syncGlobalInputs();
+    renderSlides();
+    renderGallery();
+  } finally { restoring = false; }
+  updateSaveBadge();
+}
+
+/* Warn (Save / Don't save / Cancel — two-step with native dialogs) before an action
+ * that leaves unsaved manual changes behind. Returns true when it's ok to proceed. */
+async function confirmLeave() {
+  if (!current.dirty) return true;
+  await autosaveNow(); // recovery copy is always fresh
+  if (confirm("Ada perubahan yang belum disimpan permanen (autosave aman).\n\nSimpan dulu sebagai project?")) {
+    return await manualSave(false);
+  }
+  return confirm("Lanjut TANPA menyimpan permanen? (Masih bisa dipulihkan dari Autosave)");
+}
+window.addEventListener("beforeunload", (e) => {
+  if (current.dirty) {
+    autosaveNow(); // best-effort flush
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
+
+async function checkStorage() {
+  if (storageWarned) return;
+  const est = await store.storageEstimate();
+  if (est && est.quota && est.usage / est.quota > 0.85) {
+    storageWarned = true;
+    const b = document.getElementById("saveBadge");
+    if (b) { b.textContent = "⚠ Penyimpanan browser hampir penuh — hapus project lama"; b.className = "save-badge dirty"; }
+  }
+}
+
+/* ---- project manager panel (Recent autosaves + Saved projects) ---- */
+async function refreshProjectPanel() {
+  const box = document.getElementById("projectPanel");
+  if (!box || box.style.display === "none") return;
+  const listEl = document.getElementById("projectLists");
+  const metas = await store.listMeta();
+  const autos = metas.filter((m) => m.kind === "auto");
+  const saved = metas.filter((m) => m.kind === "saved");
+  const t = (d) => d ? new Date(d).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-";
+  const row = (m, actions) => {
+    const div = document.createElement("div"); div.className = "proj-row";
+    const th = m.thumb ? `<img class="proj-thumb" src="${m.thumb}" alt="">` : '<div class="proj-thumb ph">🖼️</div>';
+    div.innerHTML = `${th}<div class="proj-info"><strong>${m.name || "Tanpa Judul"}</strong><span>${m.kind === "auto" ? "autosave " : "diubah "}${t(m.kind === "auto" ? m.autosavedAt : m.updatedAt)}</span></div><div class="proj-actions"></div>`;
+    const act = div.querySelector(".proj-actions");
+    actions.forEach(([label, fn, danger]) => {
+      const b = document.createElement("button"); b.className = "link-btn" + (danger ? " danger" : ""); b.textContent = label;
+      b.addEventListener("click", fn); act.appendChild(b);
+    });
+    return div;
+  };
+  const openMeta = async (m) => {
+    if (!(await confirmLeave())) return;
+    const proj = await store.loadProject(m.id);
+    if (proj) { applyProject(proj.meta, proj.content); refreshProjectPanel(); }
+  };
+  listEl.innerHTML = "";
+  const h1 = document.createElement("h3"); h1.textContent = "Autosave terakhir (pemulihan, maks. 3)"; listEl.appendChild(h1);
+  if (!autos.length) listEl.appendChild(Object.assign(document.createElement("p"), { className: "hint", textContent: "Belum ada autosave." }));
+  autos.forEach((m) => listEl.appendChild(row(m, [
+    ["Lanjutkan", () => openMeta(m)],
+    ["Hapus", async () => { if (confirm(`Hapus autosave "${m.name}"?`)) { await store.deleteProject(m.id); store.sweepAssets().catch(() => {}); refreshProjectPanel(); } }, true],
+  ])));
+  const h2 = document.createElement("h3"); h2.textContent = "Project tersimpan (permanen)"; listEl.appendChild(h2);
+  if (!saved.length) listEl.appendChild(Object.assign(document.createElement("p"), { className: "hint", textContent: "Belum ada — pakai tombol Simpan." }));
+  saved.forEach((m) => listEl.appendChild(row(m, [
+    ["Buka", () => openMeta(m)],
+    ["Ganti nama", async () => {
+      const n = prompt("Nama baru:", m.name); if (n == null) return;
+      await store.updateMeta(m.id, { name: n.trim() || m.name });
+      if (current.savedId === m.id) { current.name = n.trim() || m.name; updateSaveBadge(); }
+      refreshProjectPanel();
+    }],
+    ["Duplikat", async () => {
+      const proj = await store.loadProject(m.id); if (!proj) return;
+      await store.saveProject(Object.assign({}, m, { id: store.newId("p"), name: m.name + " (salinan)", createdAt: Date.now(), updatedAt: Date.now() }), proj.content);
+      refreshProjectPanel();
+    }],
+    ["Export", async () => {
+      const json = await store.exportProject(m.id); if (!json) return;
+      downloadBlob(new Blob([JSON.stringify(json)], { type: "application/json" }), (m.name || "project").replace(/[^\w\- ]+/g, "") + ".carousel.json");
+    }],
+    ["Hapus", async () => {
+      if (!confirm(`Hapus permanen project "${m.name}"?`)) return;
+      await store.deleteProject(m.id);
+      if (current.savedId === m.id) { current.savedId = null; current.dirty = true; updateSaveBadge(); }
+      store.sweepAssets().catch(() => {});
+      refreshProjectPanel();
+    }, true],
+  ])));
+}
+function wireProjectUI() {
+  const panel = document.getElementById("projectPanel");
+  document.getElementById("projectsBtn").addEventListener("click", () => {
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+    refreshProjectPanel();
+  });
+  document.getElementById("saveBtn").addEventListener("click", () => manualSave(false));
+  document.getElementById("saveAsBtn").addEventListener("click", () => manualSave(true));
+  document.getElementById("newProjectBtn").addEventListener("click", async () => {
+    if (!(await confirmLeave())) return;
+    newProject(); refreshProjectPanel();
+  });
+  const impInput = document.getElementById("projectImportInput");
+  document.getElementById("projectImportBtn").addEventListener("click", () => impInput.click());
+  impInput.addEventListener("change", async () => {
+    const f = impInput.files[0]; impInput.value = "";
+    if (!f) return;
+    try {
+      const json = JSON.parse(await f.text());
+      const meta = await store.importProject(json, store.newId("p"));
+      refreshProjectPanel();
+      if (confirm(`Project "${meta.name}" di-import. Buka sekarang?`)) {
+        if (!(await confirmLeave())) return;
+        const proj = await store.loadProject(meta.id);
+        if (proj) applyProject(proj.meta, proj.content);
+      }
+    } catch (e) { alert("Import gagal: " + (e.message || e)); }
+  });
+}
+
+/* Sync the Pengaturan-Global inputs from state (after restore / new project). */
+function syncGlobalInputs() {
+  igInput.value = state.settings.igHandle || "";
+  webInput.value = state.settings.website || "";
+  ratioSelect.value = state.settings.ratio || "4:5";
+  customFontInput.value = state.settings.customFontUrl || "";
+  [...fontRow.children].forEach((c) => c.classList.toggle("active", !state.settings.customFontUrl && c.textContent === state.settings.font));
+  if (state.bgImage) { bgThumb.src = state.bgImage; bgThumb.style.display = "block"; bgPlaceholder.style.display = "none"; bgRemoveBtn.style.display = "inline-block"; }
+  else { bgThumb.style.display = "none"; bgPlaceholder.style.display = "flex"; bgRemoveBtn.style.display = "none"; }
+  const ed = document.getElementById("briefEditor");
+  if (ed) { ed.value = state.briefText || ""; ed.dispatchEvent(new Event("__sync")); }
+  renderGlobalBgEditor();
+}
+
 /* ---------------- Slide render data ---------------- */
+// Custom background fill: build the CSS for solid / linear / radial, from either the
+// slide's own colours ("custom") or the global ones in settings ("global").
+function fillCss(type, c1, c2, angle) {
+  if (type === "solid") return c1;
+  if (type === "linear") return `linear-gradient(${angle != null ? angle : 155}deg, ${c1}, ${c2})`;
+  if (type === "radial") return `radial-gradient(circle at 50% 38%, ${c1}, ${c2})`;
+  return "";
+}
+function resolveBgFill(slide) {
+  if (slide.bgColorMode === "custom") return fillCss(slide.bgFillType || "solid", slide.bgC1 || "#2F318B", slide.bgC2 || "#101138", slide.bgAngle);
+  if (slide.bgColorMode === "global" && state.settings.bgFillType) {
+    return fillCss(state.settings.bgFillType, state.settings.bgC1 || "#2F318B", state.settings.bgC2 || "#101138", state.settings.bgAngle);
+  }
+  return "";
+}
 function slideData(slide, idx, logo) {
   return {
+    bgFill: resolveBgFill(slide),
+    figureImage: slide.figureImage, figureSide: slide.figureSide, figureLayer: slide.figureLayer,
+    figX: slide.figX, figY: slide.figY, figScale: slide.figScale, figRotate: slide.figRotate, figFlip: slide.figFlip, figOpacity: slide.figOpacity,
     type: slide.type, theme: slide.theme, align: slide.align, topic: slide.topic,
     eyebrow: slide.eyebrow, title: slide.title, subtitle: slide.subtitle, button: slide.button,
     items: slide.items, colA: slide.colA, itemsA: slide.itemsA, colB: slide.colB, itemsB: slide.itemsB,
@@ -144,6 +464,130 @@ function slideData(slide, idx, logo) {
     logo: logo || LOGO_DATAURL, index: idx + 1, total: state.slides.length,
     igHandle: state.settings.igHandle, website: state.settings.website,
   };
+}
+
+/* ================= Background colour system =================
+ * Full colour control: native picker + HEX + RGB inputs, eyedropper (when the
+ * browser has window.EyeDropper), recent & favourite swatches (localStorage), and
+ * solid / linear / radial fill types. One editor is reused for the GLOBAL background
+ * (Pengaturan Global) and for each slide's CUSTOM background. */
+const FILL_TYPES = [{ id: "solid", label: "Warna solid" }, { id: "linear", label: "Gradasi linear" }, { id: "radial", label: "Gradasi radial" }];
+const RECENT_KEY = "cs-recent-colors", FAV_KEY = "cs-fav-colors";
+const readColors = (k) => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch (e) { return []; } };
+const writeColors = (k, arr) => { try { localStorage.setItem(k, JSON.stringify(arr.slice(0, 12))); } catch (e) {} };
+const pushRecent = (hex) => { const a = readColors(RECENT_KEY).filter((c) => c !== hex); a.unshift(hex); writeColors(RECENT_KEY, a); };
+const hexToRgbArr = (hex) => { const h = (hex || "#000000").replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) || 0); };
+const rgbArrToHex = (r, g, b) => "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v || 0))).toString(16).padStart(2, "0")).join("");
+const validHex = (s) => /^#?[0-9a-fA-F]{6}$/.test(s || "");
+
+function buildColorControl(obj, key, labelText, onChange, swatchTarget) {
+  const wrap = document.createElement("div"); wrap.className = "cp-slot";
+  wrap.innerHTML =
+    `<div class="cp-label">${labelText}</div>` +
+    `<div class="cp-row"><input type="color" class="cp-pick"/><input type="text" class="cp-hex" maxlength="7" spellcheck="false"/>` +
+    `<span class="cp-rgb">R<input type="number" class="cp-num r" min="0" max="255"> G<input type="number" class="cp-num g" min="0" max="255"> B<input type="number" class="cp-num b" min="0" max="255"></span>` +
+    `<button type="button" class="icon-btn cp-eye" title="Ambil warna dari layar">💧</button>` +
+    `<button type="button" class="icon-btn cp-fav" title="Simpan ke favorit">☆</button></div>`;
+  const pick = wrap.querySelector(".cp-pick"), hexIn = wrap.querySelector(".cp-hex");
+  const rIn = wrap.querySelector(".r"), gIn = wrap.querySelector(".g"), bIn = wrap.querySelector(".b");
+  const apply = (hex, from, commit) => {
+    if (!validHex(hex)) return;
+    hex = hex.startsWith("#") ? hex : "#" + hex;
+    obj[key] = hex.toLowerCase();
+    if (from !== "pick") pick.value = obj[key];
+    if (from !== "hex") hexIn.value = obj[key];
+    const [r, g, b] = hexToRgbArr(obj[key]);
+    if (from !== "rgb") { rIn.value = r; gIn.value = g; bIn.value = b; }
+    if (commit) pushRecent(obj[key]);
+    if (swatchTarget) swatchTarget.focusKey = key;
+    onChange();
+  };
+  apply(obj[key] || "#2f318b", "init", false);
+  pick.addEventListener("input", () => apply(pick.value, "pick", false));
+  pick.addEventListener("change", () => apply(pick.value, "pick", true));
+  hexIn.addEventListener("input", () => apply(hexIn.value, "hex", false));
+  hexIn.addEventListener("change", () => apply(hexIn.value, "hex", true));
+  [rIn, gIn, bIn].forEach((inp) => inp.addEventListener("input", () => apply(rgbArrToHex(+rIn.value, +gIn.value, +bIn.value), "rgb", false)));
+  const eye = wrap.querySelector(".cp-eye");
+  if (window.EyeDropper) {
+    eye.addEventListener("click", async () => {
+      try { const res = await new window.EyeDropper().open(); apply(res.sRGBHex, "eye", true); } catch (e) { /* cancelled */ }
+    });
+  } else eye.style.display = "none";
+  wrap.querySelector(".cp-fav").addEventListener("click", () => {
+    const favs = readColors(FAV_KEY);
+    if (!favs.includes(obj[key])) { favs.unshift(obj[key]); writeColors(FAV_KEY, favs); }
+    if (swatchTarget && swatchTarget.render) swatchTarget.render();
+  });
+  wrap.__apply = (hex) => apply(hex, "swatch", true);
+  return wrap;
+}
+
+/* Full background editor: fill type + colour slot(s) + angle + swatches. */
+function buildBgFillEditor(obj, onChange, opts) {
+  opts = opts || {};
+  const box = document.createElement("div"); box.className = "bgfill-editor";
+  const typeOptions = (opts.allowNone ? [{ id: "", label: "Tanpa (default tema)" }] : []).concat(FILL_TYPES);
+  const shared = { focusKey: "bgC1", render: null };
+  let c1, c2, angleRow, swatchBox;
+  const rerenderVisibility = () => {
+    const t = obj.bgFillType;
+    c1.style.display = t ? "" : "none";
+    c2.style.display = (t === "linear" || t === "radial") ? "" : "none";
+    angleRow.style.display = t === "linear" ? "" : "none";
+    swatchBox.style.display = t ? "" : "none";
+  };
+  box.appendChild(dropdown(typeOptions, obj.bgFillType || "", (id) => { obj.bgFillType = id; rerenderVisibility(); onChange(); }));
+  c1 = buildColorControl(obj, "bgC1", obj.bgFillType === "solid" ? "Warna" : "Warna 1", onChange, shared);
+  c2 = buildColorControl(obj, "bgC2", "Warna 2", onChange, shared);
+  box.appendChild(c1); box.appendChild(c2);
+  angleRow = document.createElement("div"); angleRow.className = "cp-slot";
+  angleRow.innerHTML = `<div class="cp-label">Arah gradasi</div><div class="slider-with-num"><input type="range" min="0" max="360" value="${obj.bgAngle != null ? obj.bgAngle : 155}"/><input type="number" class="num-input" min="0" max="360" value="${obj.bgAngle != null ? obj.bgAngle : 155}"/></div>`;
+  const ar = angleRow.querySelector("input[type=range]"), an = angleRow.querySelector("input[type=number]");
+  const setAngle = (v, from) => { const val = Math.max(0, Math.min(360, parseInt(v, 10) || 0)); obj.bgAngle = val; if (from !== "r") ar.value = val; if (from !== "n") an.value = val; onChange(); };
+  ar.addEventListener("input", () => setAngle(ar.value, "r"));
+  an.addEventListener("input", () => setAngle(an.value, "n"));
+  box.appendChild(angleRow);
+
+  swatchBox = document.createElement("div"); swatchBox.className = "cp-swatches";
+  shared.render = () => {
+    const mk = (hex, extraTitle) => {
+      const s = document.createElement("button"); s.type = "button"; s.className = "cp-swatch"; s.style.background = hex;
+      s.title = hex + (extraTitle || "");
+      s.addEventListener("click", () => { (shared.focusKey === "bgC2" ? c2 : c1).__apply(hex); });
+      return s;
+    };
+    swatchBox.innerHTML = "";
+    const recent = readColors(RECENT_KEY), favs = readColors(FAV_KEY);
+    if (favs.length) {
+      const l = document.createElement("span"); l.className = "cp-swlabel"; l.textContent = "★ Favorit:"; swatchBox.appendChild(l);
+      favs.forEach((h) => {
+        const s = mk(h, " — dblclick hapus dari favorit");
+        s.addEventListener("dblclick", () => { writeColors(FAV_KEY, readColors(FAV_KEY).filter((x) => x !== h)); shared.render(); });
+        swatchBox.appendChild(s);
+      });
+    }
+    if (recent.length) {
+      const l = document.createElement("span"); l.className = "cp-swlabel"; l.textContent = "Terakhir:"; swatchBox.appendChild(l);
+      recent.forEach((h) => swatchBox.appendChild(mk(h)));
+    }
+  };
+  shared.render();
+  box.appendChild(swatchBox);
+  rerenderVisibility();
+  return box;
+}
+
+/* The global background editor in Pengaturan Global (rebuilt on restore). */
+function renderGlobalBgEditor() {
+  const host = document.getElementById("globalBgFill");
+  if (!host) return;
+  host.innerHTML = "";
+  host.appendChild(buildBgFillEditor(state.settings, () => { refreshAll(); markDirty(); }, { allowNone: true }));
+  const applyAll = document.createElement("button");
+  applyAll.type = "button"; applyAll.className = "link-btn"; applyAll.textContent = "Terapkan ke semua slide (mode Global)";
+  applyAll.addEventListener("click", () => { state.slides.forEach((s) => { s.bgColorMode = "global"; }); renderSlides(); });
+  host.appendChild(applyAll);
 }
 
 /* ---------------- Global settings ---------------- */
@@ -183,26 +627,111 @@ async function pdfToText(arrayBuffer) {
   }
   return out;
 }
+/* Build slides from brief text (used by the text editor button AND file import). */
+function buildSlidesFromText(text, label) {
+  if (state.slides.some((s) => s.title || s.items || s.subtitle || s.itemsA)) {
+    if (!confirm("Buat slide dari teks ini? Slide sekarang akan diganti (autosave aman).")) return false;
+  }
+  const slides = parseBrief(text);
+  state.slides = slides.map(freshSlide);
+  renderSlides();
+  importStatus.textContent = `✓ ${slides.length} slide kebentuk${label ? " dari " + label : ""}`;
+  document.getElementById("slidesList").scrollIntoView({ behavior: "smooth", block: "start" });
+  return true;
+}
+/* File import now feeds the TEXT EDITOR first (UTF-8 .txt/.md, or text extracted
+ * from a PDF), so the content stays editable before building — and is persisted
+ * with the project like manually typed text. */
 async function importBrief(file) {
   const name = (file.name || "").toLowerCase();
   if (!/\.(pdf|txt|md)$/.test(name)) { importStatus.textContent = "Format harus .pdf/.txt/.md"; return; }
-  if (state.slides.some((s) => s.title || s.items || s.subtitle || s.itemsA)) {
-    if (!confirm("Import akan mengganti semua slide sekarang. Lanjut?")) return;
-  }
   importStatus.innerHTML = '<span class="spinner"></span> Membaca…'; importSub.textContent = file.name;
   try {
     let text;
     if (name.endsWith(".pdf")) text = await pdfToText(await file.arrayBuffer());
     else text = await file.text();
     if (!text.trim()) throw new Error("Nggak ada teks kebaca. Kalau PDF hasil scan/gambar, teksnya nggak bisa diambil.");
-    const slides = parseBrief(text);
-    state.slides = slides.map(freshSlide);
-    renderSlides();
-    importStatus.textContent = `✓ ${slides.length} slide kebentuk`;
-    document.getElementById("slidesList").scrollIntoView({ behavior: "smooth", block: "start" });
+    const ed = document.getElementById("briefEditor");
+    if (ed.value.trim() && ed.value.trim() !== text.trim() &&
+        !confirm("Isi editor teks akan diganti dengan isi file ini. Lanjut?")) {
+      importStatus.textContent = "Dibatalkan — isi editor tidak diubah."; return;
+    }
+    ed.value = text; state.briefText = text; ed.dispatchEvent(new Event("__sync")); markDirty();
+    const textTab = document.querySelector('.input-tab[data-mode="text"]');
+    if (textTab) textTab.click(); // show the editable text
+    importStatus.textContent = "✓ Teks dimuat ke editor";
+    if (confirm(`Teks dari "${file.name}" sudah dimuat ke editor.\n\nLangsung buat slide sekarang? (Batal = edit dulu di editor)`)) {
+      buildSlidesFromText(text, file.name);
+    }
   } catch (err) { importStatus.textContent = "Error: " + err.message; }
 }
 wireDropzone(importDropzone, importFileInput, importBrief);
+
+/* ---- text-editor input mode ---- */
+const briefEditor = document.getElementById("briefEditor");
+const briefCount = document.getElementById("briefCount");
+function briefGrow() {
+  briefEditor.style.height = "auto";
+  briefEditor.style.height = Math.min(560, Math.max(180, briefEditor.scrollHeight + 4)) + "px";
+  briefCount.textContent = briefEditor.value.length ? briefEditor.value.length.toLocaleString("id-ID") + " karakter" : "";
+}
+briefEditor.addEventListener("input", () => { state.briefText = briefEditor.value; briefGrow(); markDirty(); });
+briefEditor.addEventListener("__sync", briefGrow);
+document.getElementById("buildFromTextBtn").addEventListener("click", () => {
+  const text = briefEditor.value;
+  if (!text.trim()) { alert("Editornya masih kosong — tulis atau import dulu."); return; }
+  try { buildSlidesFromText(text, "editor"); }
+  catch (e) { alert("Teks belum bisa diparse: " + e.message); }
+});
+document.getElementById("loadExampleToEditorBtn").addEventListener("click", async () => {
+  if (briefEditor.value.trim() && !confirm("Ganti isi editor dengan contoh format?")) return;
+  try {
+    briefEditor.value = await (await fetch("contoh-brief.txt")).text();
+    state.briefText = briefEditor.value; briefGrow(); markDirty();
+  } catch (e) { alert("Gagal memuat contoh."); }
+});
+// Mode switch — switching NEVER clears content, it just shows the other pane.
+document.querySelectorAll(".input-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".input-tab").forEach((t2) => t2.classList.toggle("active", t2 === tab));
+    document.getElementById("inputTextPane").style.display = tab.dataset.mode === "text" ? "block" : "none";
+    document.getElementById("inputFilePane").style.display = tab.dataset.mode === "file" ? "block" : "none";
+    if (tab.dataset.mode === "text") briefGrow();
+  });
+});
+
+/* ---- template gallery (additive presets; existing layouts untouched) ---- */
+function renderTemplateGallery() {
+  const host = document.getElementById("templateGallery");
+  const catRow = document.getElementById("templateCats");
+  if (!host || !catRow) return;
+  let activeCat = PRESET_CATEGORIES[0].id;
+  const paint = () => {
+    catRow.innerHTML = "";
+    PRESET_CATEGORIES.forEach((c) => {
+      const b = document.createElement("button");
+      b.className = "chip sm" + (c.id === activeCat ? " active" : "");
+      b.textContent = c.label;
+      b.addEventListener("click", () => { activeCat = c.id; paint(); });
+      catRow.appendChild(b);
+    });
+    host.innerHTML = "";
+    PRESETS.filter((p) => p.cat === activeCat).forEach((p) => {
+      const cardT = document.createElement("div"); cardT.className = "tpl-card";
+      cardT.innerHTML = `<strong>${p.name}</strong><span>${p.desc}</span><span class="tpl-n">${p.slides.length} slide</span>`;
+      const useBtn = document.createElement("button"); useBtn.type = "button"; useBtn.className = "btn btn-ghost btn-sm"; useBtn.textContent = "Pakai template";
+      useBtn.addEventListener("click", () => {
+        if (!confirm(`Pakai template "${p.name}"? Slide sekarang akan diganti (autosave aman).`)) return;
+        state.slides = p.slides.map((s) => freshSlide(Object.assign({}, s)));
+        renderSlides();
+        document.getElementById("slidesList").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      cardT.appendChild(useBtn);
+      host.appendChild(cardT);
+    });
+  };
+  paint();
+}
 
 // example viewer
 const showExampleBtn = document.getElementById("showExampleBtn"), exampleBox = document.getElementById("exampleBox"), exampleCode = document.getElementById("exampleCode");
@@ -373,13 +902,16 @@ function buildCard(slide, idx) {
   const grid = document.createElement("div"); grid.className = "card-grid"; card.appendChild(grid);
   const col = document.createElement("div"); col.className = "fields-col"; grid.appendChild(col);
 
+  // Dropdowns must NEVER re-render the whole editor (that reloaded all 10 preview
+  // iframes and looked like the app resetting — incl. right after Generate). A
+  // layout/tone change rebuilds ONLY this card; theme/align just repaint the preview.
   const headRow = document.createElement("div"); headRow.className = "opt-row";
-  headRow.appendChild(labeled("Layout", dropdown(TYPES, slide.type, (id) => { slide.type = id; renderSlides(); })));
-  headRow.appendChild(labeled("Tema", dropdown(THEMES, slide.theme, (id) => { slide.theme = id; renderSlides(); })));
+  headRow.appendChild(labeled("Layout", dropdown(TYPES, slide.type, (id) => { slide.type = id; rebuildCard(slide); })));
+  headRow.appendChild(labeled("Tema", dropdown(THEMES, slide.theme, (id) => { slide.theme = id; slide._send && slide._send(); })));
   col.appendChild(headRow);
 
   const optRow = document.createElement("div"); optRow.className = "opt-row";
-  optRow.appendChild(labeled("Posisi Teks", dropdown(ALIGNS, slide.align, (id) => { slide.align = id; renderSlides(); })));
+  optRow.appendChild(labeled("Posisi Teks", dropdown(ALIGNS, slide.align, (id) => { slide.align = id; slide._send && slide._send(); })));
   col.appendChild(optRow);
 
   const styleRow = document.createElement("div"); styleRow.className = "opt-row";
@@ -388,7 +920,7 @@ function buildCard(slide, idx) {
   texWrap.appendChild(swatchChipRow(TEXTURES, slide.texture, (id) => { slide.texture = id; slide._send && slide._send(); }, "texture", slide.textureTone));
   // Light/Dark tone (independent of theme) + apply-to-all-slides
   const texTools = document.createElement("div"); texTools.className = "chip-row"; texTools.style.marginTop = "6px"; texTools.style.alignItems = "center";
-  texTools.appendChild(dropdown(TEXTURE_TONES, slide.textureTone || "light", (id) => { slide.textureTone = id; renderSlides(); }));
+  texTools.appendChild(dropdown(TEXTURE_TONES, slide.textureTone || "light", (id) => { slide.textureTone = id; rebuildCard(slide); }));
   const applyAllTex = document.createElement("button");
   applyAllTex.type = "button"; applyAllTex.className = "link-btn"; applyAllTex.textContent = "Terapkan ke semua";
   applyAllTex.title = "Pakai texture, tone & posisi ini di semua slide";
@@ -427,6 +959,25 @@ function buildCard(slide, idx) {
   colorRow2.appendChild(colorField(slide, "markColor", "Warna Stabilo"));
   col.appendChild(colorRow2);
 
+  // Background COLOUR per slide: theme default / global / custom override — with a
+  // clear indicator of which source this slide is using.
+  const bgcWrap = document.createElement("div");
+  const bgcModes = [{ id: "", label: "Tema (default)" }, { id: "global", label: "🌐 Global" }, { id: "custom", label: "🎨 Custom slide ini" }];
+  bgcWrap.appendChild(dropdown(bgcModes, slide.bgColorMode, (id) => { slide.bgColorMode = id; rebuildCard(slide); }));
+  if (slide.bgColorMode === "global") {
+    const note = document.createElement("div"); note.className = "field-hint";
+    note.textContent = state.settings.bgFillType
+      ? "🌐 Slide ini pakai background warna GLOBAL (atur di Pengaturan Global)."
+      : "🌐 Mode Global aktif, tapi background global belum di-set di Pengaturan Global.";
+    bgcWrap.appendChild(note);
+  } else if (slide.bgColorMode === "custom") {
+    const note = document.createElement("div"); note.className = "field-hint";
+    note.textContent = "🎨 Slide ini pakai background warnanya SENDIRI (override global).";
+    bgcWrap.appendChild(note);
+    bgcWrap.appendChild(buildBgFillEditor(slide, () => slide._send && slide._send()));
+  }
+  col.appendChild(labeled("Warna Background", bgcWrap, "Solid / gradasi. Tema = gradasi bawaan tema."));
+
   const topicInp = document.createElement("input"); topicInp.type = "text"; topicInp.value = slide.topic || ""; topicInp.placeholder = "mis. Realita — badge kanan atas";
   topicInp.addEventListener("input", () => { slide.topic = topicInp.value; slide._send && slide._send(); });
   col.appendChild(labeled("Topik Slide", topicInp, "Kosongin kalau nggak mau badge."));
@@ -438,6 +989,25 @@ function buildCard(slide, idx) {
       imgWrap.appendChild(buildImageDropzone(slide, f.key, () => slide._send && slide._send(), "gambar meme — caption di atas & bawah"));
       imgWrap.appendChild(buildTransformControls(slide, "img", "Posisi Gambar"));
       col.appendChild(labeled(f.label, imgWrap, f.hint));
+      return;
+    }
+    if (f.kind === "figure") {
+      // Human-figure layer: transparent PNG + side/layer + move/scale/rotate/flip/opacity.
+      const wrapF = document.createElement("div");
+      wrapF.appendChild(buildImageDropzone(slide, "figureImage", () => slide._send && slide._send(), "PNG transparan — guru, murid, presenter…"));
+      const rowF = document.createElement("div"); rowF.className = "opt-row";
+      rowF.appendChild(labeled("Posisi Figur", dropdown(FIGURE_SIDES, slide.figureSide, (id) => { slide.figureSide = id; slide._send && slide._send(); })));
+      rowF.appendChild(labeled("Layer", dropdown(FIGURE_LAYERS, slide.figureLayer, (id) => { slide.figureLayer = id; slide._send && slide._send(); })));
+      wrapF.appendChild(rowF);
+      wrapF.appendChild(buildTransformControls(slide, "fig", "Geser & Skala Figur"));
+      wrapF.appendChild(buildSingleSlider(slide, "figRotate", "Rotasi (°)", -180, 180, 0));
+      wrapF.appendChild(buildSingleSlider(slide, "figOpacity", "Opacity", 0, 100, 100));
+      const flipBtn = document.createElement("button");
+      flipBtn.type = "button"; flipBtn.className = "chip sm" + (slide.figFlip ? " active" : "");
+      flipBtn.textContent = "↔ Flip horizontal"; flipBtn.style.marginTop = "6px";
+      flipBtn.addEventListener("click", () => { slide.figFlip = !slide.figFlip; flipBtn.classList.toggle("active", slide.figFlip); slide._send && slide._send(); });
+      wrapF.appendChild(flipBtn);
+      col.appendChild(labeled(f.label, wrapF, f.hint));
       return;
     }
     const inp = f.kind === "textarea" ? document.createElement("textarea") : document.createElement("input");
@@ -503,7 +1073,9 @@ function buildCard(slide, idx) {
     }
   }
   frame.addEventListener("load", () => { ready = true; send(); });
-  slide._send = send;
+  // _send = an actual user edit (marks the project dirty & schedules autosave);
+  // the bare send() on iframe load repaints without touching dirty state.
+  slide._send = () => { markDirty(); send(); };
 
   top.querySelector(".move-up").addEventListener("click", () => moveSlide(slide.id, -1));
   top.querySelector(".move-down").addEventListener("click", () => moveSlide(slide.id, 1));
@@ -515,7 +1087,16 @@ function buildCard(slide, idx) {
 function moveSlide(id, dir) { const i = state.slides.findIndex((s) => s.id === id), j = i + dir; if (j < 0 || j >= state.slides.length) return; const [it] = state.slides.splice(i, 1); state.slides.splice(j, 0, it); renderSlides(); }
 function dupSlide(id) { const i = state.slides.findIndex((s) => s.id === id); const copy = freshSlide(Object.assign({}, state.slides[i], { id: undefined, _send: null })); copy.id = crypto.randomUUID(); state.slides.splice(i + 1, 0, copy); renderSlides(); }
 function removeSlide(id) { if (state.slides.length <= 1) { alert("Minimal 1 slide."); return; } state.slides = state.slides.filter((s) => s.id !== id); renderSlides(); }
-function renderSlides() { slidesListEl.innerHTML = ""; state.slides.forEach((s, i) => slidesListEl.appendChild(buildCard(s, i))); }
+function renderSlides() { markDirty(); slidesListEl.innerHTML = ""; state.slides.forEach((s, i) => slidesListEl.appendChild(buildCard(s, i))); }
+// Replace ONE card in place — dropdown changes must not rebuild the other cards
+// (that reloaded every preview iframe and looked like a full app reset).
+function rebuildCard(slide) {
+  const idx = state.slides.findIndex((s) => s.id === slide.id);
+  const old = slidesListEl.querySelector('.slide-card[data-id="' + slide.id + '"]');
+  if (idx < 0 || !old) { renderSlides(); return; }
+  markDirty();
+  slidesListEl.replaceChild(buildCard(slide, idx), old);
+}
 function refreshAll() { state.slides.forEach((s) => s._send && s._send()); }
 
 /* ---------------- Font selector (global) ---------------- */
@@ -724,17 +1305,26 @@ async function generatePng() {
       statusMsg.textContent = `Render slide ${i + 1}/${state.slides.length}…`;
       lastPngs.push(await renderPng(slideData(state.slides[i], i)));
     }
-    gallery.innerHTML = "";
-    lastPngs.forEach((src, i) => {
-      const item = document.createElement("div"); item.className = "gallery-item";
-      item.innerHTML = `<a href="${src}" target="_blank"><img src="${src}" alt="Slide ${i + 1}" /></a><div class="gi-footer"><span>Slide ${i + 1}</span><a class="link-btn" href="${src}" download="slide-${i + 1}.png">Download</a></div>`;
-      gallery.appendChild(item);
-    });
-    gallerySection.style.display = "block"; gallerySection.scrollIntoView({ behavior: "smooth", block: "start" });
+    renderGallery();
+    gallerySection.scrollIntoView({ behavior: "smooth", block: "start" });
     statusMsg.textContent = `Selesai! ${lastPngs.length} PNG dibuat.`; statusMsg.className = "status-msg ok";
-    downloadZipBtn.style.display = "inline-flex";
+    // Generated results are part of the project: persist + refresh the thumbnail.
+    await ensureThumb();
+    markDirty();
   } catch (err) { statusMsg.textContent = "Error: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
   finally { generateBtn.disabled = generateBtnTop.disabled = false; }
+}
+/* Gallery from lastPngs — also used to RESTORE generated results with a project. */
+function renderGallery() {
+  gallery.innerHTML = "";
+  lastPngs.forEach((src, i) => {
+    const item = document.createElement("div"); item.className = "gallery-item";
+    item.innerHTML = `<a href="${src}" target="_blank"><img src="${src}" alt="Slide ${i + 1}" /></a><div class="gi-footer"><span>Slide ${i + 1}</span><a class="link-btn" href="${src}" download="slide-${i + 1}.png">Download</a></div>`;
+    gallery.appendChild(item);
+  });
+  const has = lastPngs.length > 0;
+  gallerySection.style.display = has ? "block" : "none";
+  downloadZipBtn.style.display = has ? "inline-flex" : "none";
 }
 generateBtn.addEventListener("click", generatePng);
 generateBtnTop.addEventListener("click", generatePng);
@@ -851,7 +1441,7 @@ const CENTER_CLASSES = ["list-ic", "rank", "meme-cap", "counter", "pill-btn", "e
 // Cards/boxes/badges/pills/image-frames/logo chip → editable shapes.
 const SHAPE_SEL = ".card, .table-card, .text-card, .cmp-col, .trow, .meme-frame, .list-ic, .rank, .eyebrow, .pill-btn, .counter, .trow .val, .cmp-head, .handles .ic, .logo-chip";
 
-function collectPptx(stage, markHex, data) {
+function collectPptx(stage, markHex, data, igIconPng) {
   const sr = stage.getBoundingClientRect();
   const els = [], blocks = [], images = [];
   const safeNum = (v, fb = 0) => Number.isFinite(v) ? v : fb;
@@ -1147,7 +1737,58 @@ function collectPptx(stage, markHex, data) {
     });
   });
 
+  // Human-figure PNG (figure layout) — an editable, movable picture with its
+  // rotation/flip carried over; the AABB comes from the rendered transform.
+  stage.querySelectorAll("img.figure-img").forEach((node) => {
+    const r = node.getBoundingClientRect();
+    if (r.width < 3 || r.height < 3 || !node.src) return;
+    const k = scaleFor(node);
+    const sc = ((data && data.figScale) || 100) / 100;
+    const w = node.offsetWidth * sc * k, h = node.offsetHeight * sc * k;
+    const cx = r.left + r.width / 2 - sr.left, cy = r.top + r.height / 2 - sr.top;
+    images.push({
+      src: node.src,
+      x: safeNum(cx - w / 2), y: safeNum(cy - h / 2),
+      w: safeNum(w), h: safeNum(h),
+      rotate: (data && data.figRotate) || 0,
+      flipH: !!(data && data.figFlip),
+      transparency: data && data.figOpacity != null ? Math.round(100 - data.figOpacity) : 0,
+    });
+  });
+
+  // Instagram glyph in the footer chip (an inline SVG in the DOM) — exported as a
+  // small PNG so it stays a real object next to the gold chip shape.
+  if (igIconPng) {
+    stage.querySelectorAll(".handles .ic svg").forEach((node) => {
+      const r = node.getBoundingClientRect();
+      if (r.width < 3) return;
+      images.push({ src: igIconPng, x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top), w: safeNum(r.width), h: safeNum(r.height) });
+    });
+  }
+
   return { els, blocks, images };
+}
+
+/* Rasterize the footer's inline IG SVG once (currentColor resolved to the rendered
+ * colour) so the PPTX gets a crisp PNG glyph. Cached for the whole export. */
+let _igIconPng;
+async function getIgIconPng(stage) {
+  if (_igIconPng !== undefined) return _igIconPng;
+  const svg = stage.querySelector(".handles .ic svg");
+  if (!svg) return (_igIconPng = "");
+  try {
+    const color = getComputedStyle(svg.closest(".ic")).color;
+    const xml = new XMLSerializer().serializeToString(svg).replace(/currentColor/g, color);
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = res; img.onerror = rej;
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml.replace("<svg ", '<svg width="96" height="96" '));
+    });
+    const c = document.createElement("canvas"); c.width = 96; c.height = 96;
+    c.getContext("2d").drawImage(img, 0, 0, 96, 96);
+    _igIconPng = c.toDataURL("image/png");
+  } catch (e) { _igIconPng = ""; }
+  return _igIconPng;
 }
 async function renderSlideForPptx(data) {
   window.renderStage(exportStage, data);
@@ -1161,7 +1802,8 @@ async function renderSlideForPptx(data) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
   window.refitStage(exportStage); // re-fit with real fonts before measuring
   const markHex = (data.markColor || "").replace("#", "") || null;
-  const { els, blocks, images } = collectPptx(exportStage, markHex, data);
+  const igPng = await getIgIconPng(exportStage);
+  const { els, blocks, images } = collectPptx(exportStage, markHex, data, igPng);
 
   // Single background raster underneath (gradient/photo/texture/pattern + baked
   // pills/logo/footer). All words, cards, badges and images are hidden here and
@@ -1189,13 +1831,13 @@ downloadPptxBtn.addEventListener("click", async () => {
     // Version + time in the filename so a fresh export can't be confused with an
     // older download of the same name sitting in the Downloads folder.
     const t = new Date();
-    const fname = `carousel-pastipintar-v11-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
+    const fname = `carousel-pastipintar-v13-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
     try {
       await downloadPptx(specs, fname);
     } catch (e) {
       throw new Error(`Gagal saat menyusun PPTX (PptxGenJS): ${e.stack || e.message}`);
     }
-    statusMsg.textContent = `PPTX selesai (build v11) → ${fname}. Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint).`; statusMsg.className = "status-msg ok";
+    statusMsg.textContent = `PPTX selesai (build v13) → ${fname}. Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint).`; statusMsg.className = "status-msg ok";
   } catch (err) { statusMsg.textContent = "Error PPTX: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
   finally { downloadPptxBtn.disabled = false; }
 });
@@ -1206,5 +1848,25 @@ downloadPptxBtn.addEventListener("click", async () => {
     const blob = await (await fetch("logo/logo.png")).blob();
     LOGO_DATAURL = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
   } catch (e) { /* keep url fallback */ }
-  renderSlides();
+  wireProjectUI();
+  renderTemplateGallery();
+  // Auto-restore the most recently touched project (saved or autosave recovery).
+  let restored = false;
+  try {
+    const metas = await store.listMeta();
+    if (metas.length) {
+      const proj = await store.loadProject(metas[0].id);
+      if (proj && proj.content && proj.content.slides) {
+        applyProject(proj.meta, proj.content);
+        restored = true;
+      }
+    }
+  } catch (e) { console.warn("Restore project gagal:", e); }
+  if (!restored) {
+    restoring = true;
+    try { syncGlobalInputs(); renderSlides(); renderGallery(); } finally { restoring = false; }
+  }
+  updateSaveBadge();
+  // Console/debug handle (also used by the automated tests).
+  window.__cs = { state, current, renderSlides, refreshAll, autosaveNow, manualSave, rebuildCard };
 })();

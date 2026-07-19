@@ -6,8 +6,8 @@
 <title>Pasti Pintar — Carousel Studio</title>
 <link rel="icon" href="logo/logo.png" />
 <link rel="stylesheet" href="fonts.css" />
-<link rel="stylesheet" href="stage.css?v=11" />
-<link rel="stylesheet" href="style.css?v=9" />
+<link rel="stylesheet" href="stage.css?v=13" />
+<link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body class="stage-scope">
 
@@ -20,6 +20,13 @@
     </div>
   </div>
   <div class="header-actions">
+    <div class="project-bar">
+      <span class="project-name" id="projectName">Tanpa Judul</span>
+      <span class="save-badge" id="saveBadge"></span>
+    </div>
+    <button class="btn btn-ghost" id="projectsBtn">📁 Proyek</button>
+    <button class="btn btn-ghost" id="saveBtn">💾 Simpan</button>
+    <button class="btn btn-ghost" id="saveAsBtn">Simpan Sebagai…</button>
     <button class="btn btn-ghost" id="resetBtn">Reset Draft</button>
     <button class="btn btn-primary" id="generateBtnTop">Generate</button>
   </div>
@@ -27,20 +34,49 @@
 
 <main>
 
+  <section class="panel" id="projectPanel" style="display:none">
+    <div class="slides-head">
+      <div>
+        <h2>Proyek</h2>
+        <p class="hint">Semua tersimpan <b>offline di browser ini</b> (IndexedDB) — tanpa akun, tanpa server. Autosave = file pemulihan sementara (maks. 3); tombol <b>Simpan</b> membuat project permanen.</p>
+      </div>
+      <div class="chip-row">
+        <button class="btn btn-ghost" id="newProjectBtn">✚ Proyek Baru</button>
+        <button class="btn btn-ghost" id="projectImportBtn">Import Project (.json)</button>
+        <input type="file" id="projectImportInput" accept=".json,application/json" style="display:none" />
+      </div>
+    </div>
+    <div id="projectLists" class="project-lists"></div>
+  </section>
+
   <section class="panel">
-    <h2>Import dari PDF / Teks</h2>
-    <p class="hint">Punya naskah? Drop file <b>.pdf</b>, <b>.txt</b>, atau <b>.md</b> — jumlah &amp; isi slide kebentuk otomatis.
+    <h2>Isi Konten</h2>
+    <p class="hint">Tulis/tempel teks langsung, atau import file — dua-duanya bisa diedit sebelum di-generate, dan ikut tersimpan di project.
       <button class="link-btn inline" id="showExampleBtn">Lihat contoh format</button> ·
       <a class="link-btn inline" href="contoh-brief.txt" download>Download contoh (.txt)</a></p>
-    <div class="dropzone" id="importDropzone">
-      <div class="placeholder" id="importIcon">📄</div>
-      <div class="info">
-        <strong>Drag &amp; drop file brief</strong>
-        <span id="importSub">.pdf / .txt / .md — klik buat pilih file</span>
-      </div>
-      <div class="actions"><span class="import-status" id="importStatus"></span></div>
+    <div class="input-tabs">
+      <button type="button" class="input-tab active" data-mode="text">✍️ Tulis / Tempel Teks</button>
+      <button type="button" class="input-tab" data-mode="file">📄 Import File (.txt / .md / .pdf)</button>
     </div>
-    <input type="file" accept=".pdf,.txt,.md,text/plain,text/markdown,application/pdf" id="importFileInput" style="display:none" />
+    <div id="inputTextPane">
+      <textarea id="briefEditor" class="brief-editor" spellcheck="false" placeholder="Tulis atau tempel naskah carousel-mu di sini…&#10;&#10;=== Slide ===&#10;judul: Judul slide pertama — **kata** jadi stabilo&#10;sub: Kalimat pendukung&#10;&#10;=== Slide ===&#10;judul: Slide kedua&#10;- poin satu&#10;- poin dua"></textarea>
+      <div class="brief-toolbar">
+        <span class="field-hint" id="briefCount"></span>
+        <button type="button" class="link-btn" id="loadExampleToEditorBtn">Muat contoh ke editor</button>
+        <button type="button" class="btn btn-primary" id="buildFromTextBtn">Buat Slide dari Teks</button>
+      </div>
+    </div>
+    <div id="inputFilePane" style="display:none">
+      <div class="dropzone" id="importDropzone">
+        <div class="placeholder" id="importIcon">📄</div>
+        <div class="info">
+          <strong>Drag &amp; drop file brief</strong>
+          <span id="importSub">.pdf / .txt / .md (UTF-8) — klik buat pilih file. Isinya dimuat ke editor teks dulu, jadi tetap bisa diedit.</span>
+        </div>
+        <div class="actions"><span class="import-status" id="importStatus"></span></div>
+      </div>
+      <input type="file" accept=".pdf,.txt,.md,text/plain,text/markdown,application/pdf" id="importFileInput" style="display:none" />
+    </div>
 
     <div class="example-box" id="exampleBox" style="display:none">
       <div class="example-guide">
@@ -48,7 +84,7 @@
         <ol>
           <li><b>Pisah slide</b> pakai baris <code>=== Slide ===</code> (atau header <code>Slide 1 — Topik</code>). Baris diawali <code>//</code> = catatan, diabaikan.</li>
           <li><b>Field per slide</b> (semua opsional):
-            <code>layout</code> = jenis slide (cover / highlight / list / table / compare / meme / cta) ·
+            <code>layout</code> = jenis slide (cover / highlight / list / table / compare / meme / figure / cta) ·
             <code>theme</code> = warna dasar (dark = navy, light = terang) ·
             <code>topik</code> = teks badge pil kuning di pojok kanan atas ·
             <code>eyebrow</code> = label kecil kuning miring di atas judul (mis. "STOP DULU!") ·
@@ -65,6 +101,13 @@
       </div>
       <pre class="example-code" id="exampleCode">memuat contoh…</pre>
     </div>
+  </section>
+
+  <section class="panel">
+    <h2>Template Edukasi</h2>
+    <p class="hint">Koleksi template siap pakai buat kreator edukasi, bimbel, guru &amp; pejuang UTBK — <b>tambahan</b>, semua layout lama tetap ada. Pilih kategori, klik <b>Pakai template</b>, lalu edit isinya.</p>
+    <div class="chip-row" id="templateCats"></div>
+    <div class="tpl-grid" id="templateGallery"></div>
   </section>
 
   <section class="panel">
@@ -87,6 +130,11 @@
         <input type="text" id="webInput" placeholder="pastipintar.id" />
       </div>
       </div>
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label>Background Warna / Gradasi (Global)</label>
+      <div id="globalBgFill"></div>
+      <span class="field-hint">Dipakai oleh slide yang "Warna Background"-nya di-set <b>🌐 Global</b>. Slide dengan mode <b>🎨 Custom</b> tetap pakai warnanya sendiri.</span>
     </div>
     <div class="settings-grid" style="margin-top:16px">
       <div class="field">
@@ -142,11 +190,11 @@
   <div class="stage" id="exportStage"></div>
 </div>
 
-<script src="textures.js?v=9"></script>
-<script src="stage.js?v=11"></script>
+<script src="textures.js?v=13"></script>
+<script src="stage.js?v=13"></script>
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=13"></script>
 </body>
 </html>
