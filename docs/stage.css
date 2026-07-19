@@ -26,12 +26,13 @@
 }
 
 /* ---------- Background layers ---------- */
-.stage .bg-photo { position: absolute; inset: 0; background-size: cover; background-position: center; display: none; }
+.stage .bg-photo { position: absolute; inset: 0; display: none; overflow: hidden; }
+.stage .bg-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .stage .bg-gradient { position: absolute; inset: 0; }
 .stage .bg-pattern { position: absolute; inset: -100%; opacity: 0.5; }
 .stage .scrim { position: absolute; inset: 0; display: none; }
 .stage .grain {
-  position: absolute; inset: -100%; pointer-events: none; opacity: 0.06; mix-blend-mode: overlay;
+  position: absolute; inset: -100%; pointer-events: none; opacity: 0.15; mix-blend-mode: overlay;
   background-image:
     radial-gradient(circle at 10% 20%, rgba(255,255,255,0.18) 0 1px, transparent 1.3px),
     radial-gradient(circle at 70% 35%, rgba(255,255,255,0.14) 0 1px, transparent 1.2px),
@@ -71,11 +72,14 @@
 }
 
 /* ---- Selectable pattern (garis) override ---- */
-.stage { --pat: rgba(255,255,255,0.07); }
-.stage[data-theme="light"] { --pat: rgba(47,49,139,0.10); }
+/* A bit stronger than the theme-default pattern so a user-picked pattern is clearly
+   visible the moment it is selected (was too subtle to notice on click). */
+.stage { --pat: rgba(255,255,255,0.12); }
+.stage[data-theme="light"] { --pat: rgba(47,49,139,0.16); }
 .stage[data-pattern] .bg-pattern {
-  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 32%, transparent 88%);
-  mask-image: radial-gradient(circle at 50% 42%, #000 32%, transparent 88%);
+  opacity: 0.8;
+  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 45%, transparent 92%);
+  mask-image: radial-gradient(circle at 50% 42%, #000 45%, transparent 92%);
   background-size: auto;
 }
 .stage[data-pattern="none"] .bg-pattern { display: none; background-image: none; }
@@ -97,47 +101,62 @@
 
 /* ---- Selectable texture override ---- */
 .stage[data-texture="none"] .grain { display: none; }
-.stage[data-texture="paper"] .grain {
-  opacity: 0.10; mix-blend-mode: multiply;
-  background-image:
-    repeating-linear-gradient(45deg, rgba(20,24,60,0.04) 0 1px, transparent 1px 6px),
-    repeating-linear-gradient(-45deg, rgba(20,24,60,0.03) 0 1px, transparent 1px 7px);
+/* Procedurally generated textures (see textures.js): a repeating RGBA tile (white
+   or black detail on transparent, per chosen Light/Dark tone) set inline on .grain.
+   Normal blend since the tile carries its own alpha; tone (not theme) controls colour,
+   so a dark texture can be used on a bright image and vice-versa. */
+.stage[data-texture="paper"] .grain,
+.stage[data-texture="fabric"] .grain,
+.stage[data-texture="noise"] .grain,
+.stage[data-texture="grain"] .grain {
+  inset: 0; mix-blend-mode: normal; filter: none; opacity: 0.6;
 }
-.stage[data-texture="noise"] .grain { opacity: 0.11; }
-.stage[data-theme="light"][data-texture="grain"] .grain,
-.stage[data-theme="light"][data-texture="noise"] .grain { mix-blend-mode: multiply; opacity: 0.05; }
 
-/* Theme: photo */
-.stage[data-theme="photo"] .bg-photo { display: block; }
-.stage[data-theme="photo"] .bg-gradient { background: linear-gradient(155deg, #2A2C94, #0F1038); }
-.stage[data-theme="photo"] .scrim {
+/* Background image mode (.has-bg): applied whenever a slide has a background image,
+   on ANY theme. The photo covers the slide with a readable scrim; text goes white. */
+.stage.has-bg .bg-photo { display: block; }
+/* The gradient must NOT cover the photo — keep it transparent so the image shows;
+   the scrim below provides text readability. (This opaque gradient was why a
+   background image previously looked like a solid colour.) */
+.stage.has-bg .bg-gradient { background: none !important; }
+.stage.has-bg .scrim {
   display: block;
+  /* Darken only where text sits (top strip for logo/badge, bottom for the copy);
+     leave the middle clear so the actual photo is clearly visible. */
   background:
-    linear-gradient(180deg, rgba(16,17,56,0.55) 0%, rgba(16,17,56,0.05) 22%, rgba(16,17,56,0.15) 50%, rgba(16,17,56,0.82) 82%, rgba(12,13,44,0.96) 100%),
-    linear-gradient(90deg, rgba(47,49,139,0.30), rgba(0,143,215,0.10));
+    linear-gradient(180deg, rgba(16,17,56,0.45) 0%, rgba(16,17,56,0) 18%, rgba(16,17,56,0) 50%, rgba(16,17,56,0.78) 84%, rgba(12,13,44,0.94) 100%);
 }
-.stage[data-theme="photo"] .bg-pattern { display: none; }
+.stage.has-bg .bg-pattern { display: none; }
+/* Texture stays ON TOP of the background photo (grain is the topmost bg layer),
+   so a selected texture remains visible even over a custom uploaded image. */
+/* On a background image, force readable light text regardless of light/dark theme. */
+.stage.has-bg, .stage.has-bg[data-theme="light"] { color: #fff; }
+.stage.has-bg[data-theme="light"] .display,
+.stage.has-bg[data-theme="light"] .statement,
+.stage.has-bg[data-theme="light"] .section-title,
+.stage.has-bg[data-theme="light"] .subtitle,
+.stage.has-bg[data-theme="light"] .handles { color: #fff; }
 
 /* ---------- Top bar ---------- */
 .stage .stage-top { position: absolute; top: 54px; left: 60px; right: 60px; display: flex; align-items: center; justify-content: space-between; z-index: 6; }
-.stage .logo-chip { background: #fff; border-radius: 16px; padding: 9px 16px; display: flex; align-items: center; box-shadow: 0 10px 26px rgba(0,0,0,0.22); }
-.stage .logo-chip img { height: 50px; width: auto; display: block; }
+.stage .logo-chip { background: #fff; border-radius: 20px; padding: 12px 22px; display: flex; align-items: center; box-shadow: 0 10px 26px rgba(0,0,0,0.22); }
+.stage .logo-chip img { height: 72px; width: auto; max-width: 320px; object-fit: contain; display: block; }
 .stage .counter {
-  font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 25px; letter-spacing: 0.5px;
-  padding: 10px 22px; border-radius: 999px; background: var(--gold); color: var(--navy-deep);
-  box-shadow: 0 10px 26px rgba(0,0,0,0.22); max-width: 520px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 32px; letter-spacing: 0.5px;
+  padding: 12px 28px; border-radius: 999px; background: var(--gold); color: var(--navy-deep);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.22); max-width: 560px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .stage[data-theme="light"] .counter { box-shadow: 0 8px 20px rgba(247,180,0,0.35); }
 
 /* ---------- Footer ---------- */
 .stage .stage-foot { position: absolute; left: 60px; right: 60px; bottom: 46px; display: flex; align-items: center; justify-content: space-between; z-index: 6; }
-.stage .handles { display: flex; align-items: center; gap: 18px; font-weight: 700; font-size: 24px; opacity: 0.92; }
-.stage .handles .h { display: flex; align-items: center; gap: 8px; }
-.stage .handles .ic { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800; background: var(--gold); color: var(--navy-deep); }
+.stage .handles { display: flex; align-items: center; gap: 22px; font-weight: 800; font-size: 30px; opacity: 0.96; }
+.stage .handles .h { display: flex; align-items: center; gap: 10px; }
+.stage .handles .ic { width: 38px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 800; background: var(--gold); color: var(--navy-deep); }
 .stage[data-theme="light"] .handles { color: var(--navy); }
 
 /* ---------- Body ---------- */
-.stage .stage-body { position: absolute; left: 60px; right: 60px; top: 150px; bottom: 120px; z-index: 5; display: flex; flex-direction: column; }
+.stage .stage-body { position: absolute; left: 60px; right: 60px; top: 190px; bottom: 130px; z-index: 5; display: flex; flex-direction: column; }
 
 /* ---------- Shared elements ---------- */
 .stage .eyebrow {
@@ -177,9 +196,10 @@
 .stage .statement mark { --mk: var(--mark-color, var(--gold-soft)); padding: 0.06em 0.24em; border-radius: 6px; }
 .stage[data-theme="light"] .statement mark { color: var(--ink); }
 
-/* PPTX background mode: hide editable words + highlight fills, keep every decoration
-   (cards, chips, icons, pills, logo, footer, gradient, grain). Text is re-added as
-  real editable PPTX text boxes on top, with run-level highlight in text. */
+/* PPTX background mode: hide everything that is re-emitted above as its own editable
+   object — words, highlight fills, card/badge/frame fills, badge numbers and the
+   image itself — while keeping the pure background (gradient/photo/texture/pattern)
+   plus baked pills, logo and footer. */
 .stage.pptx-bg .eyebrow,
 .stage.pptx-bg .display,
 .stage.pptx-bg .statement,
@@ -187,25 +207,29 @@
 .stage.pptx-bg .pill-btn,
 .stage.pptx-bg .section-title,
 .stage.pptx-bg .list-txt,
+.stage.pptx-bg .list-ic,
 .stage.pptx-bg .trow .name,
 .stage.pptx-bg .trow .val,
+.stage.pptx-bg .rank,
 .stage.pptx-bg .cmp-head,
 .stage.pptx-bg .cmp-tx,
 .stage.pptx-bg .meme-cap,
+.stage.pptx-bg .img-caption,
 .stage.pptx-bg .counter { color: transparent !important; text-shadow: none !important; }
 .stage.pptx-bg mark { background: transparent !important; color: transparent !important; }
-.stage.pptx-bg .card, 
-.stage.pptx-bg .table-card, 
-.stage.pptx-bg .text-card, 
-.stage.pptx-bg .cmp-col, 
-.stage.pptx-bg .trow, 
-.stage.pptx-bg .meme-frame, 
-.stage.pptx-bg .list-ic, 
-.stage.pptx-bg .rank { 
-  background: transparent !important; 
-  box-shadow: none !important; 
-  border-color: transparent !important; 
+.stage.pptx-bg .card,
+.stage.pptx-bg .table-card,
+.stage.pptx-bg .text-card,
+.stage.pptx-bg .cmp-col,
+.stage.pptx-bg .trow,
+.stage.pptx-bg .meme-frame,
+.stage.pptx-bg .list-ic,
+.stage.pptx-bg .rank {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
 }
+.stage.pptx-bg .meme-frame img { opacity: 0 !important; }
 
 /* optional per-slide text color override (only for text sitting on the background) */
 .stage.has-text-color .display,
@@ -213,6 +237,10 @@
 .stage.has-text-color .subtitle,
 .stage.has-text-color .section-title,
 .stage.has-text-color .meme-cap { color: var(--text-color) !important; }
+/* Independent title colour (headings), overrides text colour for the big title text. */
+.stage.has-title-color .display,
+.stage.has-title-color .statement,
+.stage.has-title-color .section-title { color: var(--title-color) !important; }
 
 .stage .pill-btn {
   align-self: flex-start; margin-top: 34px; font-family: 'Archivo', sans-serif; font-weight: 800;
@@ -259,6 +287,9 @@
 .stage .meme-frame { border-radius: 26px; overflow: hidden; border: 8px solid #fff; background: #fff; box-shadow: 0 26px 60px rgba(0,0,0,0.45); max-height: 720px; display: flex; }
 .stage .meme-frame img { width: 100%; height: 100%; object-fit: contain; display: block; max-height: 704px; }
 .stage[data-theme="light"] .meme-cap { color: var(--ink); }
+/* Caption under a regular (non-meme) image. */
+.stage .img-caption { font-weight: 600; font-size: 26px; line-height: 1.4; text-align: center; margin-top: 16px; opacity: 0.92; white-space: pre-line; }
+.stage[data-theme="light"] .img-caption { color: var(--ink-soft); }
 
 /* compare (2-column) */
 .stage .l-compare { width: 100%; flex: 1; display: flex; flex-direction: column; }

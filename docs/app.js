@@ -1,5 +1,5 @@
 import { parseBrief } from "./import-brief.js";
-import { downloadPptx } from "./pptx-export.js?v=4";
+import { downloadPptx } from "./pptx-export.js?v=7";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -13,13 +13,17 @@ const TYPES = [
   { id: "meme", label: "Meme" },
   { id: "cta", label: "CTA" },
 ];
-const THEMES = [{ id: "dark", label: "Navy" }, { id: "light", label: "Terang" }, { id: "photo", label: "Foto" }];
+const THEMES = [{ id: "dark", label: "Navy" }, { id: "light", label: "Terang" }];
+// Background source per design — decoupled from the light/dark theme so any slide can
+// show a background image (global from settings, or a custom one for this slide).
+const BG_MODES = [{ id: "", label: "Tanpa" }, { id: "global", label: "Global" }, { id: "custom", label: "Custom" }];
 const ALIGNS = [{ id: "", label: "Auto" }, { id: "top", label: "Atas" }, { id: "center", label: "Tengah" }, { id: "bottom", label: "Bawah" }];
 const FONTS = [
   { id: "Anton", label: "Anton" }, { id: "Bebas Neue", label: "Bebas Neue" }, { id: "Oswald", label: "Oswald" },
   { id: "Archivo Black", label: "Archivo Black" }, { id: "Montserrat", label: "Montserrat" },
 ];
-const TEXTURES = [{ id: "", label: "Default" }, { id: "grain", label: "Grain" }, { id: "paper", label: "Paper" }, { id: "noise", label: "Noise" }, { id: "none", label: "Polos" }];
+const TEXTURES = [{ id: "", label: "Default" }, { id: "paper", label: "Paper" }, { id: "fabric", label: "Fabric" }, { id: "noise", label: "Noise" }, { id: "grain", label: "Grain" }, { id: "none", label: "Polos" }];
+const TEXTURE_TONES = [{ id: "light", label: "Terang" }, { id: "dark", label: "Gelap" }];
 const PATTERNS = [{ id: "", label: "Default" }, { id: "grid", label: "Grid" }, { id: "dots", label: "Dots" }, { id: "diagonal", label: "Garis" }, { id: "waves", label: "Waves" }, { id: "none", label: "Polos" }];
 
 const TYPE_FIELDS = {
@@ -52,7 +56,7 @@ const TYPE_FIELDS = {
   ],
   meme: [
     { key: "capTop", label: "Caption atas (opsional)", kind: "text", ph: "Jalur mandiri be like:" },
-    { key: "image", label: "Gambar / meme", kind: "image" },
+    { key: "image", label: "Gambar Meme", kind: "image", hint: "Placeholder khusus meme — caption di atas & bawah gambar." },
     { key: "capBottom", label: "Caption bawah (opsional)", kind: "text", ph: "" },
   ],
   cta: [
@@ -79,12 +83,16 @@ const DEFAULT_SLIDES = [
 
 /* ---------------- State ---------------- */
 function freshSlide(base) {
+  base = base || {};
+  // Migrate the old "photo" theme → dark theme + a background source.
+  if (base.theme === "photo") { base = Object.assign({}, base, { theme: "dark", bgMode: base.bgImage ? "custom" : "global" }); }
   return Object.assign(
     { id: crypto.randomUUID(), type: "cover", theme: "dark", align: "", topic: "", eyebrow: "", title: "", subtitle: "", button: "",
       items: "", colA: "", itemsA: "", colB: "", itemsB: "", capTop: "", capBottom: "",
-      textColor: "", markColor: "", texture: "", pattern: "", image: null, bgImage: null, 
+      textColor: "", titleColor: "", markColor: "", texture: "", textureTone: "light", textureOpacity: 60, pattern: "", image: null, imageCaption: "", bgImage: null, bgMode: "",
+      imgX: 50, imgY: 50, imgZoom: 100,
       bgX: 50, bgY: 50, bgZoom: 100, textureX: 50, textureY: 50, textureScale: 100, patternX: 50, patternY: 50, patternScale: 100, _send: null },
-    base || {}
+    base
   );
 }
 const state = { bgImage: null, settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5" }, slides: DEFAULT_SLIDES.map(freshSlide) };
@@ -94,7 +102,7 @@ let LOGO_DATAURL = "logo/logo.png";
 /* ---------------- Helpers ---------------- */
 function readFileAsDataUrl(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); }); }
 function resizeImage(dataUrl, maxDim) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       let { width, height } = img;
@@ -102,6 +110,8 @@ function resizeImage(dataUrl, maxDim) {
       const c = document.createElement("canvas"); c.width = width; c.height = height;
       c.getContext("2d").drawImage(img, 0, 0, width, height); resolve(c.toDataURL("image/png"));
     };
+    // Fail gracefully instead of hanging the upload if the image can't be decoded.
+    img.onerror = () => reject(new Error("Gambar tidak bisa dibaca (format tidak didukung?)."));
     img.src = dataUrl;
   });
 }
@@ -122,10 +132,12 @@ function slideData(slide, idx, logo) {
     type: slide.type, theme: slide.theme, align: slide.align, topic: slide.topic,
     eyebrow: slide.eyebrow, title: slide.title, subtitle: slide.subtitle, button: slide.button,
     items: slide.items, colA: slide.colA, itemsA: slide.itemsA, colB: slide.colB, itemsB: slide.itemsB,
-    capTop: slide.capTop, capBottom: slide.capBottom, image: slide.image,
-    bgImage: slide.bgImage || state.bgImage || null,
-    textColor: slide.textColor, markColor: slide.markColor, texture: slide.texture, pattern: slide.pattern,
+    capTop: slide.capTop, capBottom: slide.capBottom, image: slide.image, imageCaption: slide.imageCaption,
+    bgImage: slide.bgMode === "custom" ? (slide.bgImage || null) : slide.bgMode === "global" ? (state.bgImage || null) : null,
+    textColor: slide.textColor, titleColor: slide.titleColor, markColor: slide.markColor,
+    texture: slide.texture, textureTone: slide.textureTone, textureOpacity: slide.textureOpacity, pattern: slide.pattern,
     bgX: slide.bgX, bgY: slide.bgY, bgZoom: slide.bgZoom, 
+    imgX: slide.imgX, imgY: slide.imgY, imgZoom: slide.imgZoom,
     textureX: slide.textureX, textureY: slide.textureY, textureScale: slide.textureScale, 
     patternX: slide.patternX, patternY: slide.patternY, patternScale: slide.patternScale,
     font: state.settings.font, customFontUrl: state.settings.customFontUrl, ratio: state.settings.ratio,
@@ -139,7 +151,8 @@ const bgDropzone = document.getElementById("bgDropzone"), bgFileInput = document
 const bgThumb = document.getElementById("bgThumb"), bgPlaceholder = document.getElementById("bgPlaceholder"), bgRemoveBtn = document.getElementById("bgRemoveBtn");
 wireDropzone(bgDropzone, bgFileInput, async (file) => {
   if (!guardImage(file)) return;
-  state.bgImage = await loadImage(file, 1600);
+  try { state.bgImage = await loadImage(file, 1600); }
+  catch (e) { alert(e.message || "Gambar gagal dimuat."); return; }
   bgThumb.src = state.bgImage; bgThumb.style.display = "block"; bgPlaceholder.style.display = "none"; bgRemoveBtn.style.display = "inline-block";
   refreshAll();
 });
@@ -223,6 +236,47 @@ function chipRow(options, current, onPick, extraClass) {
   });
   return row;
 }
+// Chip row with a visual preview swatch per option (texture/pattern presets).
+// `kind` is "texture" or "pattern"; the swatch CSS keys off data-<kind>.
+function swatchChipRow(options, current, onPick, kind, tone) {
+  const row = document.createElement("div"); row.className = "chip-row";
+  options.forEach((o) => {
+    const b = document.createElement("button");
+    b.className = "chip sm has-swatch" + ((current || "") === o.id ? " active" : "");
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.setAttribute("data-" + kind, o.id || "default");
+    // Texture swatches show the real generated texture (in the chosen tone) on a mid
+    // tone so both light and dark detail read.
+    if (kind === "texture" && window.CarouselTextures) {
+      const url = window.CarouselTextures.get(o.id, tone);
+      if (url) { sw.style.backgroundImage = `url('${url}')`; sw.style.backgroundSize = "34px"; sw.style.backgroundColor = "#8890b0"; }
+    }
+    b.appendChild(sw);
+    b.appendChild(document.createTextNode(o.label));
+    b.addEventListener("click", () => {
+      // Move the active highlight to the clicked chip immediately (these chips only
+      // re-send to the preview, they don't rebuild the card, so update it here).
+      [...row.children].forEach((c) => c.classList.remove("active"));
+      b.classList.add("active");
+      onPick(o.id);
+    });
+    row.appendChild(b);
+  });
+  return row;
+}
+// Compact dropdown selector (declutters the UI vs. long button rows).
+function dropdown(options, current, onPick) {
+  const sel = document.createElement("select"); sel.className = "select-input";
+  options.forEach((o) => {
+    const op = document.createElement("option"); op.value = o.id;
+    op.textContent = (o.emoji ? o.emoji + " " : "") + o.label;
+    if ((current || "") === o.id) op.selected = true;
+    sel.appendChild(op);
+  });
+  sel.addEventListener("change", () => onPick(sel.value));
+  return sel;
+}
 function colorField(slide, key, labelText) {
   const wrap = document.createElement("div"); wrap.className = "color-field";
   const input = document.createElement("input"); input.type = "color"; input.value = slide[key] || "#F7B400";
@@ -244,37 +298,68 @@ function buildImageDropzone(slide, key, onChange, subtitle) {
     onChange();
   }
   if (slide[key]) setImg(slide[key]);
-  wireDropzone(dz, input, async (file) => { if (!guardImage(file)) return; setImg(await loadImage(file, 1400)); });
+  wireDropzone(dz, input, async (file) => { if (!guardImage(file)) return; try { setImg(await loadImage(file, 1400)); } catch (e) { alert(e.message || "Gambar gagal dimuat."); } });
   removeBtn.addEventListener("click", (e) => { e.stopPropagation(); setImg(null); });
   return dz;
 }
 
 function buildTransformControls(slide, prefix, label) {
   const wrap = document.createElement("div"); wrap.className = "transform-ctrls";
-  wrap.style.display = "flex"; wrap.style.gap = "8px"; wrap.style.marginTop = "4px"; wrap.style.fontSize = "12px";
-  
+  wrap.style.display = "flex"; wrap.style.gap = "10px"; wrap.style.marginTop = "4px"; wrap.style.fontSize = "12px";
+
+  // Each control = a slider + a synced numeric input (type or drag; they stay in sync).
   const addSlider = (key, text, min, max, def) => {
     const div = document.createElement("div"); div.style.flex = "1";
-    div.innerHTML = `<div style="display:flex;justify-content:space-between;color:var(--ink-soft)"><span>${text}</span><span>${slide[prefix+key]||def}</span></div>
-    <input type="range" min="${min}" max="${max}" value="${slide[prefix+key]||def}" style="width:100%">`;
-    const input = div.querySelector("input"), valSpan = div.querySelectorAll("span")[1];
-    input.addEventListener("input", () => {
-      const val = parseInt(input.value);
-      slide[prefix+key] = val;
-      valSpan.textContent = val;
+    const cur = slide[prefix + key] || def;
+    div.innerHTML =
+      `<div style="color:var(--text-soft);margin-bottom:2px">${text}</div>` +
+      `<div class="slider-with-num"><input type="range" min="${min}" max="${max}" value="${cur}"/>` +
+      `<input type="number" class="num-input" min="${min}" max="${max}" value="${cur}"/></div>`;
+    const range = div.querySelector('input[type="range"]');
+    const num = div.querySelector('input[type="number"]');
+    const apply = (v, from) => {
+      let val = parseInt(v, 10);
+      if (!Number.isFinite(val)) return;
+      val = Math.max(min, Math.min(max, val));
+      slide[prefix + key] = val;
+      if (from !== "range") range.value = val;
+      if (from !== "num") num.value = val;
       slide._send && slide._send();
-    });
+    };
+    range.addEventListener("input", () => apply(range.value, "range"));
+    num.addEventListener("input", () => apply(num.value, "num"));
     wrap.appendChild(div);
   };
-  
+
   addSlider("X", "X", 0, 100, 50);
   addSlider("Y", "Y", 0, 100, 50);
   addSlider("Scale", "Size", 10, 300, 100);
-  
+
   const container = document.createElement("div");
-  container.appendChild(document.createTextNode(label));
+  if (label) { const lb = document.createElement("div"); lb.style.cssText = "font-size:11.5px;color:var(--text-soft);margin-top:6px"; lb.textContent = label; container.appendChild(lb); }
   container.appendChild(wrap);
   return container;
+}
+// One labelled slider + synced numeric input for a single slide property.
+function buildSingleSlider(slide, key, text, min, max, def, unit) {
+  const div = document.createElement("div"); div.style.marginTop = "6px"; div.style.fontSize = "12px";
+  const cur = slide[key] != null ? slide[key] : def;
+  div.innerHTML =
+    `<div style="color:var(--text-soft);margin-bottom:2px">${text}</div>` +
+    `<div class="slider-with-num"><input type="range" min="${min}" max="${max}" value="${cur}"/>` +
+    `<input type="number" class="num-input" min="${min}" max="${max}" value="${cur}"/></div>`;
+  const range = div.querySelector('input[type="range"]'), num = div.querySelector('input[type="number"]');
+  const apply = (v, from) => {
+    let val = parseInt(v, 10); if (!Number.isFinite(val)) return;
+    val = Math.max(min, Math.min(max, val));
+    slide[key] = val;
+    if (from !== "range") range.value = val;
+    if (from !== "num") num.value = val;
+    slide._send && slide._send();
+  };
+  range.addEventListener("input", () => apply(range.value, "range"));
+  num.addEventListener("input", () => apply(num.value, "num"));
+  return div;
 }
 
 function buildCard(slide, idx) {
@@ -288,38 +373,73 @@ function buildCard(slide, idx) {
   const grid = document.createElement("div"); grid.className = "card-grid"; card.appendChild(grid);
   const col = document.createElement("div"); col.className = "fields-col"; grid.appendChild(col);
 
-  col.appendChild(labeled("Layout", chipRow(TYPES, slide.type, (id) => { slide.type = id; renderSlides(); })));
+  const headRow = document.createElement("div"); headRow.className = "opt-row";
+  headRow.appendChild(labeled("Layout", dropdown(TYPES, slide.type, (id) => { slide.type = id; renderSlides(); })));
+  headRow.appendChild(labeled("Tema", dropdown(THEMES, slide.theme, (id) => { slide.theme = id; renderSlides(); })));
+  col.appendChild(headRow);
 
   const optRow = document.createElement("div"); optRow.className = "opt-row";
-  optRow.appendChild(labeled("Tema", chipRow(THEMES, slide.theme, (id) => { slide.theme = id; renderSlides(); }, (o) => "theme-" + o.id)));
-  optRow.appendChild(labeled("Posisi Teks", chipRow(ALIGNS, slide.align, (id) => { slide.align = id; renderSlides(); })));
+  optRow.appendChild(labeled("Posisi Teks", dropdown(ALIGNS, slide.align, (id) => { slide.align = id; renderSlides(); })));
   col.appendChild(optRow);
 
   const styleRow = document.createElement("div"); styleRow.className = "opt-row";
   
   const texWrap = document.createElement("div");
-  texWrap.appendChild(chipRow(TEXTURES, slide.texture, (id) => { slide.texture = id; slide._send && slide._send(); }));
+  texWrap.appendChild(swatchChipRow(TEXTURES, slide.texture, (id) => { slide.texture = id; slide._send && slide._send(); }, "texture", slide.textureTone));
+  // Light/Dark tone (independent of theme) + apply-to-all-slides
+  const texTools = document.createElement("div"); texTools.className = "chip-row"; texTools.style.marginTop = "6px"; texTools.style.alignItems = "center";
+  texTools.appendChild(dropdown(TEXTURE_TONES, slide.textureTone || "light", (id) => { slide.textureTone = id; renderSlides(); }));
+  const applyAllTex = document.createElement("button");
+  applyAllTex.type = "button"; applyAllTex.className = "link-btn"; applyAllTex.textContent = "Terapkan ke semua";
+  applyAllTex.title = "Pakai texture, tone & posisi ini di semua slide";
+  applyAllTex.addEventListener("click", () => {
+    state.slides.forEach((s) => { s.texture = slide.texture; s.textureTone = slide.textureTone; s.textureX = slide.textureX; s.textureY = slide.textureY; s.textureScale = slide.textureScale; });
+    renderSlides();
+  });
+  texTools.appendChild(applyAllTex);
+  texWrap.appendChild(texTools);
+  texWrap.appendChild(buildSingleSlider(slide, "textureOpacity", "Opacity", 0, 100, 60));
   texWrap.appendChild(buildTransformControls(slide, "texture", ""));
   styleRow.appendChild(labeled("Texture", texWrap));
-  
+
   const patWrap = document.createElement("div");
-  patWrap.appendChild(chipRow(PATTERNS, slide.pattern, (id) => { slide.pattern = id; slide._send && slide._send(); }));
+  patWrap.appendChild(swatchChipRow(PATTERNS, slide.pattern, (id) => { slide.pattern = id; slide._send && slide._send(); }, "pattern"));
+  const patTools = document.createElement("div"); patTools.className = "chip-row"; patTools.style.marginTop = "6px";
+  const applyAllPat = document.createElement("button");
+  applyAllPat.type = "button"; applyAllPat.className = "link-btn"; applyAllPat.textContent = "Terapkan ke semua";
+  applyAllPat.title = "Pakai pattern & posisi ini di semua slide";
+  applyAllPat.addEventListener("click", () => {
+    state.slides.forEach((s) => { s.pattern = slide.pattern; s.patternX = slide.patternX; s.patternY = slide.patternY; s.patternScale = slide.patternScale; });
+    renderSlides();
+  });
+  patTools.appendChild(applyAllPat);
+  patWrap.appendChild(patTools);
   patWrap.appendChild(buildTransformControls(slide, "pattern", ""));
   styleRow.appendChild(labeled("Garis / Pattern", patWrap));
   
   col.appendChild(styleRow);
 
   const colorRow = document.createElement("div"); colorRow.className = "opt-row";
+  colorRow.appendChild(colorField(slide, "titleColor", "Warna Judul"));
   colorRow.appendChild(colorField(slide, "textColor", "Warna Teks"));
-  colorRow.appendChild(colorField(slide, "markColor", "Warna Stabilo"));
   col.appendChild(colorRow);
+  const colorRow2 = document.createElement("div"); colorRow2.className = "opt-row";
+  colorRow2.appendChild(colorField(slide, "markColor", "Warna Stabilo"));
+  col.appendChild(colorRow2);
 
   const topicInp = document.createElement("input"); topicInp.type = "text"; topicInp.value = slide.topic || ""; topicInp.placeholder = "mis. Realita — badge kanan atas";
   topicInp.addEventListener("input", () => { slide.topic = topicInp.value; slide._send && slide._send(); });
   col.appendChild(labeled("Topik Slide", topicInp, "Kosongin kalau nggak mau badge."));
 
   (TYPE_FIELDS[slide.type] || []).forEach((f) => {
-    if (f.kind === "image") { col.appendChild(labeled(f.label, buildImageDropzone(slide, f.key, () => slide._send && slide._send()), f.hint)); return; }
+    if (f.kind === "image") {
+      // Dedicated meme-image placeholder (meme layout).
+      const imgWrap = document.createElement("div");
+      imgWrap.appendChild(buildImageDropzone(slide, f.key, () => slide._send && slide._send(), "gambar meme — caption di atas & bawah"));
+      imgWrap.appendChild(buildTransformControls(slide, "img", "Posisi Gambar"));
+      col.appendChild(labeled(f.label, imgWrap, f.hint));
+      return;
+    }
     const inp = f.kind === "textarea" ? document.createElement("textarea") : document.createElement("input");
     if (f.kind === "textarea") inp.rows = f.rows || 3; else inp.type = "text";
     inp.value = slide[f.key] || ""; inp.placeholder = f.ph || "";
@@ -327,12 +447,34 @@ function buildCard(slide, idx) {
     col.appendChild(labeled(f.label, inp, f.hint));
   });
 
-  if (slide.theme === "photo") {
-    const bgWrap = document.createElement("div");
-    bgWrap.appendChild(buildImageDropzone(slide, "bgImage", () => slide._send && slide._send(), "nimpa background global"));
-    bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
-    col.appendChild(labeled("Background Slide Ini", bgWrap, "Opsional."));
+  // Regular-image placeholder (non-meme layouts): an ordinary image shown inside the
+  // slide, with an optional caption displayed underneath it.
+  if (slide.type !== "meme") {
+    const imgWrap = document.createElement("div");
+    imgWrap.appendChild(buildImageDropzone(slide, "image", () => slide._send && slide._send(), "gambar biasa di dalam slide"));
+    imgWrap.appendChild(buildTransformControls(slide, "img", "Posisi Gambar"));
+    const capInput = document.createElement("input"); capInput.type = "text";
+    capInput.value = slide.imageCaption || ""; capInput.placeholder = "Caption di bawah gambar (opsional)";
+    capInput.style.marginTop = "8px";
+    capInput.addEventListener("input", () => { slide.imageCaption = capInput.value; slide._send && slide._send(); });
+    imgWrap.appendChild(capInput);
+    col.appendChild(labeled("Gambar (opsional)", imgWrap, "Muncul di dalam slide, dengan caption di bawahnya."));
   }
+
+  // Background source: None / Global (from Pengaturan Global) / Custom (this slide).
+  // Works on any theme — an image background overlays the navy/light gradient.
+  const bgWrap = document.createElement("div");
+  bgWrap.appendChild(dropdown(BG_MODES, slide.bgMode, (id) => { slide.bgMode = id; renderSlides(); }));
+  if (slide.bgMode === "custom") {
+    bgWrap.appendChild(buildImageDropzone(slide, "bgImage", () => slide._send && slide._send(), "background khusus slide ini"));
+    bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
+  } else if (slide.bgMode === "global") {
+    const note = document.createElement("div"); note.className = "field-hint";
+    note.textContent = state.bgImage ? "Pakai background global dari Pengaturan Global." : "Belum ada background global — upload di Pengaturan Global dulu.";
+    bgWrap.appendChild(note);
+    bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
+  }
+  col.appendChild(labeled("Background", bgWrap, "Global = ikut Pengaturan Global. Custom = gambar khusus slide ini."));
 
   const prev = document.createElement("div"); prev.className = "preview-col";
   const frameWrap = document.createElement("div"); frameWrap.className = "preview-frame-wrap";
@@ -342,7 +484,24 @@ function buildCard(slide, idx) {
   grid.appendChild(prev);
 
   let ready = false;
-  function send() { if (ready) frame.contentWindow.postMessage({ type: "render", data: slideData(slide, idx) }, "*"); }
+  function send() { 
+    if (ready) {
+      const w = 1080;
+      let h = 1350;
+      if (state.settings.ratio === "1:1") h = 1080;
+      else if (state.settings.ratio === "3:4") h = 1440;
+      else if (state.settings.ratio === "9:16") h = 1920;
+      frame.style.width = w + "px";
+      frame.style.height = h + "px";
+      const wrapW = 240;
+      const wrapH = Math.round(wrapW * (h / w));
+      frameWrap.style.width = wrapW + "px";
+      frameWrap.style.height = wrapH + "px";
+      frame.style.transform = "scale(" + (wrapW / w) + ")";
+
+      frame.contentWindow.postMessage({ type: "render", data: slideData(slide, idx) }, "*"); 
+    }
+  }
   frame.addEventListener("load", () => { ready = true; send(); });
   slide._send = send;
 
@@ -392,15 +551,9 @@ customFontInput.addEventListener("input", () => {
   refreshAll();
 });
 
-const ratioRow = document.getElementById("ratioRow");
-ratioRow.querySelectorAll("button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    state.settings.ratio = btn.dataset.ratio;
-    [...ratioRow.children].forEach(c => c.classList.remove("active"));
-    btn.classList.add("active");
-    refreshAll();
-  });
-});
+const ratioSelect = document.getElementById("ratioSelect");
+ratioSelect.value = state.settings.ratio;
+ratioSelect.addEventListener("change", () => { state.settings.ratio = ratioSelect.value; refreshAll(); });
 
 
 /* ---------------- Add / reset ---------------- */
@@ -422,8 +575,54 @@ const statusMsg = document.getElementById("statusMsg"), gallerySection = documen
 let lastPngs = [];
 
 function waitImages(el) {
-  const imgs = [...el.querySelectorAll("img")];
+  // Only wait on images that actually have a source — a src-less <img> (e.g. the
+  // background-photo placeholder when no bg is set) never fires load/error and would
+  // otherwise hang the export forever.
+  const imgs = [...el.querySelectorAll("img")].filter((im) => im.getAttribute("src"));
   return Promise.all(imgs.map((im) => (im.complete && im.naturalWidth) ? Promise.resolve() : new Promise((r) => { im.onload = im.onerror = r; })));
+}
+
+/* Precompute a font-embed CSS string from our SAME-ORIGIN fonts.css, inlining each
+ * woff2 as a data URL. Passing this to html-to-image makes it use these fonts and
+ * NOT scan document stylesheets — which is what crashes export when a cross-origin
+ * Google Fonts <link> is present (SecurityError reading cssRules). Cached after first
+ * build. Returns null on failure so html-to-image falls back to its own embedding. */
+let _fontEmbedCSS;
+async function getFontEmbedCSS() {
+  if (_fontEmbedCSS !== undefined) return _fontEmbedCSS;
+  try {
+    const cssText = await (await fetch("fonts.css")).text();
+    const re = /url\(['"]?([^'")]+\.woff2)['"]?\)/g;
+    const urls = [...new Set([...cssText.matchAll(re)].map((m) => m[1]))];
+    const map = {};
+    await Promise.all(urls.map(async (u) => {
+      try {
+        const buf = await (await fetch(u)).arrayBuffer();
+        const bytes = new Uint8Array(buf); let bin = "";
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        map[u] = "data:font/woff2;base64," + btoa(bin);
+      } catch (e) { /* skip this font */ }
+    }));
+    _fontEmbedCSS = cssText.replace(re, (m, u) => (map[u] ? `url(${map[u]})` : m));
+  } catch (e) {
+    _fontEmbedCSS = null;
+  }
+  return _fontEmbedCSS;
+}
+
+/* Rasterize the export stage to PNG, resilient to font/resource embedding errors:
+ * use our same-origin font CSS; if html-to-image still throws (e.g. an odd remote
+ * resource), retry once skipping font embedding so export never hard-fails. */
+async function stageToPng(w, h, extraOpts) {
+  const fontEmbedCSS = await getFontEmbedCSS();
+  const base = { width: w, height: h, pixelRatio: 1, cacheBust: true };
+  if (fontEmbedCSS) base.fontEmbedCSS = fontEmbedCSS;
+  const opts = Object.assign(base, extraOpts || {});
+  try {
+    return await window.htmlToImage.toPng(exportStage, opts);
+  } catch (e) {
+    return await window.htmlToImage.toPng(exportStage, Object.assign({}, opts, { skipFonts: true }));
+  }
 }
 async function renderPng(data) {
   window.renderStage(exportStage, data);
@@ -434,7 +633,8 @@ async function renderPng(data) {
   await waitImages(exportStage);
   await document.fonts.ready;
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  return await window.htmlToImage.toPng(exportStage, { width: w, height: h, pixelRatio: 1, cacheBust: true });
+  window.refitStage(exportStage); // re-fit now that the real fonts are loaded
+  return await stageToPng(w, h);
 }
 async function generatePng() {
   generateBtn.disabled = generateBtnTop.disabled = true;
@@ -467,7 +667,13 @@ downloadZipBtn.addEventListener("click", async () => {
   downloadBlob(await zip.generateAsync({ type: "blob" }), "carousel.zip");
 });
 
-/* ---------------- Export: PPTX (pixel-faithful + editable) ---------------- */
+/* ---------------- Export: PPTX (editable, layered — Canva-first) ----------------
+ * Every content element becomes its own EDITABLE native PPTX object — nothing is
+ * flattened together. Each text block is a real text box (fonts named so Canva maps
+ * them to its own Anton/Bebas/etc.), stabilo words keep a run-level highlight,
+ * cards/boxes/badges are shapes, badge numbers are text, images are pictures. Only
+ * the background (gradient/photo/texture/pattern/pills/logo/footer) is one raster
+ * underneath. So 10 on-slide elements → 10 separate editable objects in Canva. */
 function rgbToHex(rgb) {
   const m = String(rgb).match(/[\d.]+/g);
   if (!m) return "000000";
@@ -489,63 +695,64 @@ function extractRuns(node, upper) {
         if (tag === "br") { if (runs.length) runs[runs.length - 1].br = true; }
         else if (tag === "mark") walk(c, true, bold);
         else if (c.classList && c.classList.contains("lead")) {
-          // Lead text in list items — capture per-run font size
           const leadCs = getComputedStyle(c);
           const prevLen = runs.length;
           walk(c, mark, true);
-          // Tag runs generated inside .lead with their specific font size
-          for (let i = prevLen; i < runs.length; i++) {
-            runs[i].fontSize = parseFloat(leadCs.fontSize);
-          }
+          for (let i = prevLen; i < runs.length; i++) runs[i].fontSize = parseFloat(leadCs.fontSize);
           if (runs.length) runs[runs.length - 1].br = true;
-        }
-        else walk(c, mark, bold);
+        } else walk(c, mark, bold);
       }
     });
   })(node, false, false);
   return runs;
 }
-const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.trow .name,.trow .val,.cmp-head,.cmp-tx,.meme-cap,.counter";
-const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head"];
+
+// Every text element → its own editable text box (incl. badge/rank numbers).
+const EDIT_SEL = ".eyebrow,.display,.statement,.subtitle,.pill-btn,.section-title,.list-txt,.list-ic,.trow .name,.trow .val,.rank,.cmp-head,.cmp-tx,.meme-cap,.img-caption,.counter";
+const MID_CLASSES = ["eyebrow", "pill-btn", "counter", "meme-cap", "name", "val", "cmp-head", "list-ic", "rank"];
+const CENTER_CLASSES = ["list-ic", "rank", "meme-cap", "counter", "pill-btn", "eyebrow"];
+// Cards/boxes/badges/image-frames → editable shapes.
 const SHAPE_SEL = ".card, .table-card, .text-card, .cmp-col, .trow, .meme-frame, .list-ic, .rank";
 
-function collectPptx(stage, markHex) {
+function collectPptx(stage, markHex, data) {
   const sr = stage.getBoundingClientRect();
-  const els = [];
-  const blocks = [];
+  const els = [], blocks = [], images = [];
   const safeNum = (v, fb = 0) => Number.isFinite(v) ? v : fb;
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-  
-  // Collect text boxes
+
+  // ---- editable text boxes ----
   stage.querySelectorAll(EDIT_SEL).forEach((node) => {
     const r = node.getBoundingClientRect();
     if (r.width < 3 || r.height < 3) return;
     const cs = getComputedStyle(node);
+    const runs = extractRuns(node, cs.textTransform === "uppercase");
+    if (!runs.length) return;
     const lsRaw = cs.letterSpacing;
     const letterSpacingPx = (lsRaw && lsRaw !== "normal") ? parseFloat(lsRaw) : 0;
     const isDisplay = node.classList.contains("display") || node.classList.contains("statement") || node.classList.contains("section-title");
+    const isBadge = node.classList.contains("list-ic") || node.classList.contains("rank");
     const isSmall = node.classList.contains("eyebrow") || node.classList.contains("pill-btn") || node.classList.contains("counter");
-    const padW = isDisplay ? 12 : isSmall ? 8 : 6;
-    const padH = isDisplay ? 12 : isSmall ? 6 : 6;
+    const padW = isBadge ? 0 : isDisplay ? 12 : isSmall ? 8 : 6;
+    const padH = isBadge ? 0 : isDisplay ? 12 : isSmall ? 6 : 6;
     const elemMarkHex = (markHex || (isDisplay ? "F7B400" : "FFD65A")).replace("#", "");
-
+    const centered = CENTER_CLASSES.some((c) => node.classList.contains(c));
     els.push({
-      x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
+      x: safeNum(r.left - sr.left - padW / 2), y: safeNum(r.top - sr.top - padH / 2),
       w: safeNum(r.width + padW), h: safeNum(r.height + padH),
-      runs: extractRuns(node, cs.textTransform === "uppercase"),
+      runs,
       font: cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim(),
       size: clamp(safeNum(parseFloat(cs.fontSize), 18), 8, 220),
       weight: parseInt(cs.fontWeight) || 400,
       color: rgbToHex(cs.color),
-      align: cs.textAlign.indexOf("center") >= 0 ? "center" : (cs.textAlign.indexOf("right") >= 0 || cs.textAlign.indexOf("end") >= 0) ? "right" : "left",
-      valign: MID_CLASSES.some((c) => node.classList.contains(c)) ? "middle" : "top",
+      align: centered ? "center" : (cs.textAlign.indexOf("center") >= 0 ? "center" : (cs.textAlign.indexOf("right") >= 0 || cs.textAlign.indexOf("end") >= 0) ? "right" : "left"),
+      valign: (isBadge || MID_CLASSES.some((c) => node.classList.contains(c))) ? "middle" : "top",
       lineh: clamp(safeNum(parseFloat(cs.lineHeight) / parseFloat(cs.fontSize), 1.15), 0.8, 2.5),
       charSpacing: clamp(safeNum(letterSpacingPx, 0), -2, 8),
       markText: contrastHex(elemMarkHex), markFill: elemMarkHex,
     });
   });
 
-  // Collect background blocks/shapes
+  // ---- editable shapes (cards, boxes, badges, image frames) ----
   stage.querySelectorAll(SHAPE_SEL).forEach((node) => {
     const r = node.getBoundingClientRect();
     if (r.width < 3 || r.height < 3) return;
@@ -555,10 +762,19 @@ function collectPptx(stage, markHex) {
     let fillAlpha = 1;
     const m = bgStr.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([^)]+)\)/);
     if (m) fillAlpha = parseFloat(m[1]);
-    
-    // For transparent gradient backgrounds, we fallback to a solid color if possible, or just white with transparency.
-    if (fillAlpha === 0 && cs.backgroundImage !== "none") {
-       fillHex = "FFFFFF"; fillAlpha = 0.9;
+
+    // Gradient fills (gold badges, dark table rows) resolve to a transparent
+    // backgroundColor + a backgroundImage gradient; average the stops for a solid tint.
+    if (fillAlpha === 0 && cs.backgroundImage && cs.backgroundImage !== "none") {
+      const stops = cs.backgroundImage.match(/rgba?\([^)]*\)/g);
+      const acc = [0, 0, 0]; let cnt = 0;
+      (stops || []).forEach((s) => {
+        const p = s.match(/[\d.]+/g);
+        const a = p && p.length >= 4 ? parseFloat(p[3]) : 1;
+        if (p && p.length >= 3 && a > 0.05) { acc[0] += +p[0]; acc[1] += +p[1]; acc[2] += +p[2]; cnt++; }
+      });
+      if (cnt) { fillHex = acc.map((v) => Math.round(v / cnt).toString(16).padStart(2, "0")).join(""); fillAlpha = 1; }
+      else { fillHex = "FFFFFF"; fillAlpha = 0.9; }
     }
 
     blocks.push({
@@ -569,7 +785,50 @@ function collectPptx(stage, markHex) {
     });
   });
 
-  return { els, blocks };
+  // ---- highlighter (stabilo): a separate rounded box BEHIND each marked word, so it
+  //      stays an independently editable rectangle in PowerPoint. One box per visual
+  //      line fragment (a mark that wraps produces several client rects). Emitted after
+  //      the cards so it sits above them and below the text. ----
+  stage.querySelectorAll("mark").forEach((mk) => {
+    const isDisplay = !!mk.closest(".display, .statement, .section-title");
+    const fill = (markHex || (isDisplay ? "F7B400" : "FFD65A")).replace("#", "");
+    const rects = mk.getClientRects();
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i];
+      if (r.width < 3 || r.height < 3) continue;
+      blocks.push({
+        x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top),
+        w: safeNum(r.width), h: safeNum(r.height),
+        fill: { color: fill, transparency: 0 },
+        roundness: isDisplay ? 8 : 5
+      });
+    }
+  });
+
+  // ---- editable images (meme + regular) placed at their visible object-fit:contain
+  //      rect (plus pan/zoom), so they stay real, movable pictures in Canva. ----
+  stage.querySelectorAll(".meme-frame img").forEach((node) => {
+    const frame = node.parentElement;
+    const fr = frame.getBoundingClientRect();
+    const fcs = getComputedStyle(frame);
+    const bw = parseFloat(fcs.borderLeftWidth) || 0;
+    const ix = fr.left - sr.left + bw, iy = fr.top - sr.top + bw;
+    const iw = fr.width - 2 * bw, ih = fr.height - 2 * bw;
+    if (iw < 3 || ih < 3) return;
+    const nw = node.naturalWidth || iw, nh = node.naturalHeight || ih;
+    const na = nw / nh, fa = iw / ih;
+    let dw, dh;
+    if (na > fa) { dw = iw; dh = iw / na; } else { dh = ih; dw = ih * na; }
+    // pan/zoom (shared imgX/imgY/imgZoom), origin = frame-inner centre
+    const s = (data && data.imgZoom ? data.imgZoom : 100) / 100;
+    const tx = ((data && data.imgX != null ? data.imgX : 50) - 50) / 100 * iw;
+    const ty = ((data && data.imgY != null ? data.imgY : 50) - 50) / 100 * ih;
+    dw *= s; dh *= s;
+    const cx = ix + iw / 2 + tx, cy = iy + ih / 2 + ty;
+    images.push({ src: node.src, x: safeNum(cx - dw / 2), y: safeNum(cy - dh / 2), w: safeNum(dw), h: safeNum(dh) });
+  });
+
+  return { els, blocks, images };
 }
 async function renderSlideForPptx(data) {
   window.renderStage(exportStage, data);
@@ -581,12 +840,18 @@ async function renderSlideForPptx(data) {
   await document.fonts.ready;
   // Extra frame delay for layout to settle (especially for compare/list cards)
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
+  window.refitStage(exportStage); // re-fit with real fonts before measuring
   const markHex = (data.markColor || "").replace("#", "") || null;
-  const { els, blocks } = collectPptx(exportStage, markHex);
+  const { els, blocks, images } = collectPptx(exportStage, markHex, data);
+
+  // Single background raster underneath (gradient/photo/texture/pattern + baked
+  // pills/logo/footer). All words, cards, badges and images are hidden here and
+  // re-emitted above as separate editable objects.
   exportStage.classList.add("pptx-bg");
-  const bg = await window.htmlToImage.toPng(exportStage, { width: w, height: h, pixelRatio: 1, cacheBust: true });
+  const bg = await stageToPng(w, h);
   exportStage.classList.remove("pptx-bg");
-  return { bg, els, blocks, width: w, height: h };
+
+  return { bg, els, blocks, images, width: w, height: h };
 }
 downloadPptxBtn.addEventListener("click", async () => {
   downloadPptxBtn.disabled = true;

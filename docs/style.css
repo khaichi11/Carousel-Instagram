@@ -1,6 +1,8 @@
 :root {
   --navy: #2F318B; --navy-deep: #13143A; --gold: #F7B400; --gold-soft: #FFD65A; --blue: #008FD7;
   --bg: #F1F2F9; --card: #FFFFFF; --border: #E3E4F2; --text: #1B1C40; --text-soft: #6B6D91;
+  /* Shared corner-radius token — controls and swatches use this so shapes stay consistent. */
+  --radius: 10px;
 }
 * { box-sizing: border-box; }
 body.stage-scope { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); }
@@ -94,11 +96,74 @@ input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--go
 .chip.active.theme-photo { background: var(--blue); border-color: var(--blue); color: #fff; }
 
 .color-field { display: flex; align-items: center; gap: 8px; }
-.color-field input[type="color"] { width: 46px; height: 38px; border: 1.5px solid var(--border); border-radius: 10px; background: #fff; padding: 3px; cursor: pointer; }
+/* Color swatch: round the outer box AND the browser-drawn inner swatch identically,
+   so there are no mixed sharp/round corners. */
+.color-field input[type="color"] { width: 46px; height: 38px; border: 1.5px solid var(--border); border-radius: var(--radius); background: #fff; padding: 3px; cursor: pointer; }
+.color-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.color-field input[type="color"]::-webkit-color-swatch { border: none; border-radius: calc(var(--radius) - 3px); }
+.color-field input[type="color"]::-moz-color-swatch { border: none; border-radius: calc(var(--radius) - 3px); }
+.color-field .chip { border-radius: var(--radius); }
+
+/* Unified slider — one shared look for every range control (image pan/zoom,
+   texture/pattern position & scale, and any future opacity/size sliders). */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 22px; margin: 2px 0; background: transparent; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: var(--radius); background: var(--border); }
+input[type="range"]::-moz-range-track { height: 6px; border-radius: var(--radius); background: var(--border); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; margin-top: -7px;
+  width: 20px; height: 20px; border-radius: 50%; background: var(--gold);
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%; background: var(--gold);
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+input[type="range"]:focus { outline: none; }
+input[type="range"]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(247,180,0,0.30); }
+input[type="range"]:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(247,180,0,0.30); }
+
+/* Compact dropdown selector (minimal alternative to long button rows). */
+.select-input {
+  width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius);
+  padding: 10px 34px 10px 12px; font-family: inherit; font-size: 14px; font-weight: 600;
+  color: var(--text); background: #fff; cursor: pointer; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%236B6D91' stroke-width='2' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+.select-input:focus { outline: none; border-color: var(--gold); }
+
+/* Slider + synced numeric input (drag or type an exact value). */
+.slider-with-num { display: flex; align-items: center; gap: 8px; }
+.slider-with-num input[type="range"] { flex: 1; min-width: 40px; }
+.num-input { width: 66px; flex: 0 0 auto; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 6px 4px 6px 10px; font-family: inherit; font-size: 13px; text-align: left; color: var(--text); background: #fff; }
+.num-input:focus { outline: none; border-color: var(--gold); }
+
+/* Texture / pattern preset preview swatches (shown inside the picker chips). */
+.chip.has-swatch { padding-left: 8px; }
+.chip.active.has-swatch .swatch { box-shadow: 0 0 0 1.5px rgba(255,255,255,0.7); }
+.swatch {
+  width: 20px; height: 20px; border-radius: 5px; border: 1px solid var(--border);
+  flex: 0 0 auto; background-color: #fff; background-position: center;
+}
+/* pattern previews */
+.swatch[data-pattern="default"] { background: linear-gradient(135deg, var(--navy), var(--blue)); }
+.swatch[data-pattern="grid"] { background-image: linear-gradient(var(--navy) 1px, transparent 1px), linear-gradient(90deg, var(--navy) 1px, transparent 1px); background-size: 7px 7px; }
+.swatch[data-pattern="dots"] { background-image: radial-gradient(var(--navy) 1.4px, transparent 1.6px); background-size: 7px 7px; }
+.swatch[data-pattern="diagonal"] { background-image: repeating-linear-gradient(45deg, var(--navy) 0 1.5px, transparent 1.5px 6px); }
+.swatch[data-pattern="waves"] { background-image: radial-gradient(circle at 50% 100%, transparent 3.5px, var(--navy) 4px 4.6px, transparent 5px); background-size: 12px 7px; }
+.swatch[data-pattern="none"] { background: #fff; }
+/* texture previews */
+.swatch[data-texture="default"] { background: linear-gradient(135deg, #e9eaf6, #f7f8fe); }
+.swatch[data-texture="grain"], .swatch[data-texture="noise"] { background-color: #eeeffa; background-image: radial-gradient(rgba(20,24,60,0.55) 0.6px, transparent 0.9px); background-size: 4px 4px; }
+.swatch[data-texture="paper"] { background-color: #f3f0e8; background-image: repeating-linear-gradient(45deg, rgba(20,24,60,0.20) 0 1px, transparent 1px 4px); }
+.swatch[data-texture="none"] { background: #fff; }
 
 .preview-col { display: flex; flex-direction: column; align-items: center; gap: 8px; position: sticky; top: 88px; align-self: start; }
-.preview-frame-wrap { width: 240px; height: 300px; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 26px rgba(20,20,60,0.20); border: 1px solid var(--border); background: #101138; }
-.preview-frame { width: 1080px; height: 1350px; border: none; transform: scale(0.22222); transform-origin: top left; }
+.preview-frame-wrap { border-radius: 14px; overflow: hidden; box-shadow: 0 8px 26px rgba(20,20,60,0.20); border: 1px solid var(--border); background: #101138; position: relative; }
+.preview-frame { border: none; transform-origin: top left; position: absolute; top: 0; left: 0; }
 .preview-cap { font-size: 12px; color: var(--text-soft); font-weight: 600; }
 
 .add-slide-row { display: flex; justify-content: center; padding-top: 6px; }

@@ -77,6 +77,7 @@
       var frame = el("div", "meme-frame");
       var img = document.createElement("img");
       img.src = d.image;
+      img.style.transform = "translate(" + ((d.imgX||50)-50) + "%, " + ((d.imgY||50)-50) + "%) scale(" + ((d.imgZoom||100)/100) + ")";
       frame.appendChild(img);
       wrap.appendChild(frame);
     }
@@ -147,6 +148,7 @@
 
     if (d.markColor) stage.style.setProperty("--mark-color", d.markColor);
     if (d.textColor) { stage.style.setProperty("--text-color", d.textColor); stage.classList.add("has-text-color"); }
+    if (d.titleColor) { stage.style.setProperty("--title-color", d.titleColor); stage.classList.add("has-title-color"); }
     if (d.font) stage.style.setProperty("--display-font", "'" + d.font + "'");
     stage.innerHTML =
       '<div class="bg-photo"></div><div class="bg-gradient"></div><div class="bg-pattern"></div>' +
@@ -155,11 +157,16 @@
       '<div class="stage-body"></div>' +
       '<div class="stage-foot"><div class="handles"></div></div>';
 
-    var photo = stage.querySelector(".bg-photo");
-    if (theme === "photo" && d.bgImage) {
-      photo.style.backgroundImage = "url('" + String(d.bgImage).replace(/'/g, "\\'") + "')";
-      photo.style.backgroundPosition = (d.bgX||50) + "% " + (d.bgY||50) + "%";
-      photo.style.backgroundSize = (d.bgZoom||100) + "%";
+    // Background image (global or custom) — shown on ANY theme. Rendered as a real
+    // <img> (not a CSS background) so html-to-image captures it reliably on export.
+    // Only created when a bg exists (a src-less <img> would break the exporter).
+    if (d.bgImage) {
+      stage.classList.add("has-bg");
+      var photoImg = document.createElement("img");
+      photoImg.className = "bg-photo-img"; photoImg.alt = ""; photoImg.src = d.bgImage;
+      photoImg.style.objectPosition = (d.bgX || 50) + "% " + (d.bgY || 50) + "%";
+      photoImg.style.transform = "scale(" + ((d.bgZoom || 100) / 100) + ")";
+      stage.querySelector(".bg-photo").appendChild(photoImg);
     }
     
     var pattern = stage.querySelector(".bg-pattern");
@@ -167,7 +174,17 @@
       pattern.style.transform = "translate(" + ((d.patternX||50)-50) + "%, " + ((d.patternY||50)-50) + "%) scale(" + ((d.patternScale||100)/100) + ")";
     }
     var grain = stage.querySelector(".grain");
-    if (d.texture) {
+    // Procedurally generated textures (paper/fabric/noise/grain) — a tileable grayscale
+    // tile blended over the slide. Falls back to the CSS grain for the default texture.
+    if (d.texture) stage.setAttribute("data-texture-tone", d.textureTone === "dark" ? "dark" : "light");
+    var texUrl = (global.CarouselTextures && d.texture) ? global.CarouselTextures.get(d.texture, d.textureTone) : "";
+    if (texUrl) {
+      grain.style.backgroundImage = "url('" + texUrl + "')";
+      grain.style.backgroundRepeat = "repeat";
+      grain.style.backgroundSize = Math.round(512 * ((d.textureScale || 100) / 100)) + "px";
+      grain.style.backgroundPosition = (d.textureX || 50) + "% " + (d.textureY || 50) + "%";
+      if (d.textureOpacity != null) grain.style.opacity = Math.max(0, Math.min(100, d.textureOpacity)) / 100;
+    } else if (d.texture) {
       grain.style.transform = "translate(" + ((d.textureX||50)-50) + "%, " + ((d.textureY||50)-50) + "%) scale(" + ((d.textureScale||100)/100) + ")";
     }
 
@@ -185,15 +202,53 @@
     wrap.style.flexDirection = "column";
     wrap.style.width = "100%";
     if (type === "compare") { wrap.style.flex = "1"; body.style.justifyContent = "stretch"; }
-    var usesCard = theme === "photo" && (type === "cover" || type === "highlight" || type === "cta");
+    var usesCard = !!d.bgImage && (type === "cover" || type === "highlight" || type === "cta");
     if (usesCard) wrap.classList.add("text-card");
     BUILDERS[type](d, wrap);
+    
+    // Regular image (layouts other than meme): image inside the slide + optional caption below.
+    if (type !== "meme" && d.image) {
+      var imgFrame = el("div", "meme-frame");
+      imgFrame.style.marginTop = "24px";
+      var iImg = document.createElement("img");
+      iImg.src = d.image;
+      iImg.style.transform = "translate(" + ((d.imgX||50)-50) + "%, " + ((d.imgY||50)-50) + "%) scale(" + ((d.imgZoom||100)/100) + ")";
+      imgFrame.appendChild(iImg);
+      wrap.appendChild(imgFrame);
+      if (d.imageCaption) wrap.appendChild(el("div", "img-caption", inline(d.imageCaption, true)));
+    }
+
     body.appendChild(wrap);
+    // Remember alignment so refits (after fonts load, on export) keep the same anchor.
+    stage.setAttribute("data-fit-align", align);
 
     var handles = stage.querySelector(".handles");
     if (d.igHandle) handles.appendChild(el("span", "h", '<span class="ic">IG</span>' + esc(d.igHandle)));
     if (d.website) handles.appendChild(el("span", "h", '<span class="ic">@</span>' + esc(d.website)));
+
+    fitStage(stage);
+  }
+
+  // Fit-to-box safeguard: if the body content is taller than the available space
+  // (e.g. lots of text on the short 1:1 ratio), scale it down to fit instead of
+  // clipping it off-canvas. A no-op when content already fits, so it never alters
+  // layouts that were fine. Re-runnable (resets its own transform first).
+  function fitStage(stage) {
+    var body = stage.querySelector(".stage-body");
+    if (!body) return;
+    var wrap = body.firstElementChild;
+    if (!wrap) return;
+    wrap.style.transform = "";
+    var avail = body.clientHeight;
+    var need = wrap.scrollHeight;
+    if (avail > 0 && need > avail + 1) {
+      var k = Math.max(0.5, avail / need);
+      var align = stage.getAttribute("data-fit-align") || "center";
+      wrap.style.transformOrigin = align === "top" ? "top center" : align === "bottom" ? "bottom center" : "center center";
+      wrap.style.transform = "scale(" + k + ")";
+    }
   }
 
   global.renderStage = renderStage;
+  global.refitStage = fitStage;
 })(window);
