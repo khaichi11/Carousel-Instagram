@@ -1,5 +1,5 @@
 import { parseBrief } from "./import-brief.js";
-import { downloadPptx } from "./pptx-export.js?v=8";
+import { downloadPptx } from "./pptx-export.js?v=9";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -797,15 +797,27 @@ function collectPptx(stage, markHex, data) {
     const mkCs = getComputedStyle(mk);
     const mkRadius = parseFloat(mkCs.borderRadius) || (isDisplay ? 8 : 5);
     const useBand = !mk.closest(".display");
-    const rects = mk.getClientRects();
+    const padTop = parseFloat(mkCs.paddingTop) || 0;
+    const padBottom = parseFloat(mkCs.paddingBottom) || 0;
+    const padLeft = parseFloat(mkCs.paddingLeft) || 0;
+    const padRight = parseFloat(mkCs.paddingRight) || 0;
+    // Measure only the marked text content via Range; this avoids exporting a
+    // rectangle that spans the rest of the line in wrapped headings.
+    const rg = document.createRange();
+    rg.selectNodeContents(mk);
+    const rects = rg.getClientRects();
     for (let i = 0; i < rects.length; i++) {
       const r = rects[i];
       if (r.width < 3 || r.height < 3) continue;
-      const insetY = useBand ? r.height * 0.14 : 0;
-      const hh = useBand ? Math.max(2, r.height * 0.72) : r.height;
+      const x = r.left - sr.left - padLeft;
+      const y = r.top - sr.top - padTop;
+      const w = r.width + padLeft + padRight;
+      const h = r.height + padTop + padBottom;
+      const insetY = useBand ? h * 0.14 : 0;
+      const hh = useBand ? Math.max(2, h * 0.72) : h;
       blocks.push({
-        x: safeNum(r.left - sr.left), y: safeNum(r.top - sr.top + insetY),
-        w: safeNum(r.width), h: safeNum(hh),
+        x: safeNum(x), y: safeNum(y + insetY),
+        w: safeNum(w), h: safeNum(hh),
         fill: { color: fill, transparency: 0 },
         roundness: mkRadius
       });
