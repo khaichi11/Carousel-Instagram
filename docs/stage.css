@@ -197,9 +197,8 @@
 .stage[data-theme="light"] .statement mark { color: var(--ink); }
 
 /* PPTX background mode: hide everything that is re-emitted above as its own editable
-   object — words, highlight fills, card/badge/frame fills, badge numbers and the
-   image itself — while keeping the pure background (gradient/photo/texture/pattern)
-   plus baked pills, logo and footer. */
+  object — words, highlight fills, cards/badges/frames, logos and footer handles —
+  while keeping only the base background (gradient/photo/texture/pattern). */
 .stage.pptx-bg .eyebrow,
 .stage.pptx-bg .display,
 .stage.pptx-bg .statement,
@@ -215,7 +214,10 @@
 .stage.pptx-bg .cmp-tx,
 .stage.pptx-bg .meme-cap,
 .stage.pptx-bg .img-caption,
-.stage.pptx-bg .counter { color: transparent !important; text-shadow: none !important; }
+.stage.pptx-bg .counter,
+.stage.pptx-bg .handles,
+.stage.pptx-bg .handles .h,
+.stage.pptx-bg .handles .ic { color: transparent !important; text-shadow: none !important; }
 .stage.pptx-bg mark { background: transparent !important; color: transparent !important; }
 .stage.pptx-bg .card,
 .stage.pptx-bg .table-card,
