@@ -135,7 +135,10 @@
   background:
     linear-gradient(180deg, rgba(16,17,56,0.45) 0%, rgba(16,17,56,0) 18%, rgba(16,17,56,0) 50%, rgba(16,17,56,0.78) 84%, rgba(12,13,44,0.94) 100%);
 }
-.stage.has-bg .bg-pattern { display: none; }
+/* Pattern (garis) used to be forced off whenever a background photo was present
+   (.bg-pattern { display:none }); a selected pattern is now kept visible on top
+   of the photo too — it already paints after .bg-photo in the DOM/stacking order,
+   it just wasn't allowed to show at all. */
 /* Texture stays ON TOP of the background photo (grain is the topmost layer in the
    whole stage, see stage.js), so a selected texture remains visible even over a
    custom uploaded background photo. */
