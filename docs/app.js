@@ -901,6 +901,9 @@ function buildTransformControls(slide, prefix, label) {
   const wrap = document.createElement("div"); wrap.className = "transform-ctrls";
   wrap.style.display = "flex"; wrap.style.gap = "10px"; wrap.style.marginTop = "4px"; wrap.style.fontSize = "12px";
 
+  // Each addSlider registers a reset() so the shared "↺ Reset" button can restore
+  // every field in this group back to its default number in one click.
+  const resets = [];
   // Each control = a slider + a synced numeric input (type or drag; they stay in sync).
   const addSlider = (key, text, min, max, def) => {
     const div = document.createElement("div"); div.style.flex = "1";
@@ -924,6 +927,7 @@ function buildTransformControls(slide, prefix, label) {
     };
     range.addEventListener("input", () => apply(range.value, "range"));
     num.addEventListener("input", () => apply(num.value, "num"));
+    resets.push(() => { slide[prefix + key] = def; range.value = def; num.value = def; });
     wrap.appendChild(div);
   };
 
@@ -931,8 +935,22 @@ function buildTransformControls(slide, prefix, label) {
   addSlider("Y", "Y", 0, 100, 50);
   addSlider("Scale", "Size", 10, 300, 100);
 
+  // "↺ Reset" restores X/Y/Size for this group to their defaults (50 / 50 / 100).
+  const resetBtn = document.createElement("button");
+  resetBtn.type = "button"; resetBtn.className = "link-btn"; resetBtn.textContent = "↺ Reset";
+  resetBtn.title = "Kembalikan posisi & ukuran ke default";
+  resetBtn.style.cssText = "font-size:11.5px";
+  resetBtn.addEventListener("click", () => { resets.forEach((r) => r()); slide._send && slide._send(); });
+
   const container = document.createElement("div");
-  if (label) { const lb = document.createElement("div"); lb.style.cssText = "font-size:11.5px;color:var(--text-soft);margin-top:6px"; lb.textContent = label; container.appendChild(lb); }
+  // Header row: optional label on the left, the Reset button on the right (always shown,
+  // so every transform group — image, background, figure, texture, pattern — can reset).
+  const head = document.createElement("div");
+  head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px";
+  const lb = document.createElement("div"); lb.style.cssText = "font-size:11.5px;color:var(--text-soft)";
+  lb.textContent = label || "";
+  head.appendChild(lb); head.appendChild(resetBtn);
+  container.appendChild(head);
   container.appendChild(wrap);
   return container;
 }

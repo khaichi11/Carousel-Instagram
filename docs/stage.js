@@ -222,8 +222,13 @@
       stage.classList.add("has-bg");
       var photoImg = document.createElement("img");
       photoImg.className = "bg-photo-img"; photoImg.alt = ""; photoImg.src = d.bgImage;
-      photoImg.style.objectPosition = (d.bgX ?? 50) + "% " + (d.bgY ?? 50) + "%";
-      photoImg.style.transform = "scale(" + ((d.bgZoom || 100) / 100) + ")";
+      // Free-move pan (translate) instead of object-position: object-position can only
+      // pan where the cover-crop overflows, so an image that fits an axis exactly (e.g. a
+      // square photo in a 4:5 slide) couldn't move vertically at all. Translating lets the
+      // image be slid up/down/left/right freely — the area it vacates shows the slide's
+      // themed background (.stage base). X and Y behave identically. Range is ±50% so the
+      // extreme moves the image half off, matching the in-slide image control.
+      photoImg.style.transform = "translate(" + ((d.bgX ?? 50) - 50) + "%, " + ((d.bgY ?? 50) - 50) + "%) scale(" + ((d.bgZoom || 100) / 100) + ")";
       stage.querySelector(".bg-photo").appendChild(photoImg);
     }
 
