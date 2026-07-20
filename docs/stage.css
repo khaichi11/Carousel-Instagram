@@ -31,8 +31,14 @@
 .stage .bg-gradient { position: absolute; inset: 0; }
 .stage .bg-pattern { position: absolute; inset: -100%; opacity: 0.5; }
 .stage .scrim { position: absolute; inset: 0; display: none; }
+/* .grain is placed LAST in the stage's DOM (see stage.js) AND given the highest
+   z-index in the stage (stage-top/foot use 6, stage-body uses 5 — see below) so it
+   paints in front of every other layer — background photo, uploaded image, cards
+   and text — turning a selected texture into a true overlay that "texturizes"
+   whatever is underneath it. Without an explicit z-index here, DOM order alone
+   would NOT be enough: the z-index:5/6 layers would still paint on top. */
 .stage .grain {
-  position: absolute; inset: -100%; pointer-events: none; opacity: 0.15; mix-blend-mode: overlay;
+  position: absolute; inset: -100%; pointer-events: none; opacity: 0.15; mix-blend-mode: overlay; z-index: 7;
   background-image:
     radial-gradient(circle at 10% 20%, rgba(255,255,255,0.18) 0 1px, transparent 1.3px),
     radial-gradient(circle at 70% 35%, rgba(255,255,255,0.14) 0 1px, transparent 1.2px),
@@ -127,8 +133,9 @@
     linear-gradient(180deg, rgba(16,17,56,0.45) 0%, rgba(16,17,56,0) 18%, rgba(16,17,56,0) 50%, rgba(16,17,56,0.78) 84%, rgba(12,13,44,0.94) 100%);
 }
 .stage.has-bg .bg-pattern { display: none; }
-/* Texture stays ON TOP of the background photo (grain is the topmost bg layer),
-   so a selected texture remains visible even over a custom uploaded image. */
+/* Texture stays ON TOP of the background photo (grain is the topmost layer in the
+   whole stage, see stage.js), so a selected texture remains visible even over a
+   custom uploaded background photo. */
 /* On a background image, force readable light text regardless of light/dark theme. */
 .stage.has-bg, .stage.has-bg[data-theme="light"] { color: #fff; }
 .stage.has-bg[data-theme="light"] .display,

@@ -208,12 +208,17 @@
     if (d.textColor) { stage.style.setProperty("--text-color", d.textColor); stage.classList.add("has-text-color"); }
     if (d.titleColor) { stage.style.setProperty("--title-color", d.titleColor); stage.classList.add("has-title-color"); }
     if (d.font) stage.style.setProperty("--display-font", "'" + d.font + "'");
+    // .grain is the LAST element in the DOM (painted topmost, position:absolute with
+    // z-index:auto stacks in DOM order) so a selected texture sits in front of any
+    // uploaded picture (meme/content image, background photo) as well as the text —
+    // that's what "texturizes" the image instead of only tinting the empty background.
     stage.innerHTML =
       '<div class="bg-photo"></div><div class="bg-gradient"></div><div class="bg-pattern"></div>' +
-      '<div class="scrim"></div><div class="grain"></div>' +
+      '<div class="scrim"></div>' +
       '<div class="stage-top"><div class="logo-chip"><img alt="logo"></div><div class="counter" style="display:none"></div></div>' +
       '<div class="stage-body"></div>' +
-      '<div class="stage-foot"><div class="handles"></div></div>';
+      '<div class="stage-foot"><div class="handles"></div></div>' +
+      '<div class="grain"></div>';
 
     // Background image (global or custom) — shown on ANY theme. Rendered as a real
     // <img> (not a CSS background) so html-to-image captures it reliably on export.
