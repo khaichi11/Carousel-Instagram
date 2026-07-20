@@ -31,6 +31,19 @@ const TEXTURES = [{ id: "", label: "Default" }, { id: "paper", label: "Paper" },
 const TEXTURE_TONES = [{ id: "light", label: "Terang" }, { id: "dark", label: "Gelap" }];
 const PATTERNS = [{ id: "", label: "Default" }, { id: "grid", label: "Grid" }, { id: "dots", label: "Dots" }, { id: "diagonal", label: "Garis" }, { id: "waves", label: "Waves" }, { id: "none", label: "Polos" }];
 
+/* ---------------- Caption typography (regular-image & meme captions) ---------------- */
+const CAP_FONTS = [{ id: "", label: "Default" }, { id: "Plus Jakarta Sans", label: "Plus Jakarta Sans" }, { id: "Archivo", label: "Archivo" }].concat(FONTS);
+const CAP_WEIGHTS = [{ id: "400", label: "Reguler" }, { id: "600", label: "Semi Bold" }, { id: "700", label: "Bold" }, { id: "800", label: "Extra Bold" }, { id: "900", label: "Black" }];
+const CAP_ALIGNS = [{ id: "left", label: "Kiri" }, { id: "center", label: "Tengah" }, { id: "right", label: "Kanan" }];
+// Bumped well past the old fixed sizes (meme 40px/regular 26px) per request; still
+// fully editable — this is only the starting point for Global + new slides.
+function defaultCapStyle() {
+  return { size: 38, weight: "800", font: "", color: "", align: "center", lineHeight: 132, letterSpacing: 0, marginTop: 24, marginBottom: 24, padding: 0 };
+}
+/* A slide either inherits the Global caption style wholesale, or defines its own —
+ * same two-mode pattern as background colour/image so the mental model stays familiar. */
+function resolveCapStyle(slide) { return slide.capStyleMode === "custom" ? slide.capStyle : state.settings.capStyle; }
+
 const TYPE_FIELDS = {
   cover: [
     { key: "eyebrow", label: "Label kecil (opsional)", kind: "text", ph: "INFO RESMI!" },
@@ -98,23 +111,30 @@ function freshSlide(base) {
   base = base || {};
   // Migrate the old "photo" theme → dark theme + a background source.
   if (base.theme === "photo") { base = Object.assign({}, base, { theme: "dark", bgMode: base.bgImage ? "custom" : "global" }); }
-  return Object.assign(
+  const s = Object.assign(
     { id: crypto.randomUUID(), type: "cover", theme: "dark", align: "", topic: "", eyebrow: "", title: "", subtitle: "", button: "",
       items: "", colA: "", itemsA: "", colB: "", itemsB: "", capTop: "", capBottom: "",
       textColor: "", titleColor: "", markColor: "", texture: "", textureTone: "light", textureOpacity: 60, pattern: "", image: null, imageCaption: "", bgImage: null, bgMode: "",
       bgColorMode: "", bgFillType: "solid", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
+      capStyleMode: "",
       figureImage: null, figureSide: "right", figureLayer: "back", figX: 50, figY: 50, figScale: 100, figRotate: 0, figFlip: false, figOpacity: 100,
       imgX: 50, imgY: 50, imgZoom: 100,
       bgX: 50, bgY: 50, bgZoom: 100, textureX: 50, textureY: 50, textureScale: 100, patternX: 50, patternY: 50, patternScale: 100, _send: null },
     base
   );
+  // Always give the slide its OWN caption-style object — Object.assign only shallow-
+  // copies, so without this a duplicated slide (or one restored from storage) would
+  // share the same nested object as its source and editing one would mutate both.
+  s.capStyle = Object.assign(defaultCapStyle(), base.capStyle || {});
+  return s;
 }
 const state = {
   bgImage: null,
   briefText: "",
   settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5",
     bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
-    bgX: 50, bgY: 50, bgScale: 100 },
+    bgX: 50, bgY: 50, bgScale: 100,
+    capStyle: defaultCapStyle() },
   slides: DEFAULT_SLIDES.map(freshSlide),
 };
 // Lets shared controls (transform sliders) bound to settings repaint every slide.
@@ -291,7 +311,7 @@ function newProject() {
     current.name = "Tanpa Judul"; current.createdAt = Date.now();
     current.thumb = null; current.dirty = false; current.lastAuto = null; current.lastManual = null;
     state.bgImage = null; state.briefText = "";
-    Object.assign(state.settings, { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgX: 50, bgY: 50, bgScale: 100 });
+    Object.assign(state.settings, { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgX: 50, bgY: 50, bgScale: 100, capStyle: defaultCapStyle() });
     state.slides = DEFAULT_SLIDES.map(freshSlide);
     lastPngs = [];
     syncGlobalInputs();
@@ -432,6 +452,15 @@ function syncGlobalInputs() {
   const ed = document.getElementById("briefEditor");
   if (ed) { ed.value = state.briefText || ""; ed.dispatchEvent(new Event("__sync")); }
   renderGlobalBgEditor();
+  renderGlobalCapEditor();
+}
+/* Global caption typography (Pengaturan Global) — the default every slide's caption
+ * uses unless that slide sets its own "Custom slide ini" override. */
+function renderGlobalCapEditor() {
+  const host = document.getElementById("globalCapStyle");
+  if (!host) return;
+  host.innerHTML = "";
+  host.appendChild(buildCaptionEditor(state.settings.capStyle, () => { refreshAll(); markDirty(); }));
 }
 
 /* ---------------- Slide render data ---------------- */
@@ -459,6 +488,7 @@ function slideData(slide, idx, logo) {
     eyebrow: slide.eyebrow, title: slide.title, subtitle: slide.subtitle, button: slide.button,
     items: slide.items, colA: slide.colA, itemsA: slide.itemsA, colB: slide.colB, itemsB: slide.itemsB,
     capTop: slide.capTop, capBottom: slide.capBottom, image: slide.image, imageCaption: slide.imageCaption,
+    capStyle: resolveCapStyle(slide),
     bgImage: slide.bgMode === "custom" ? (slide.bgImage || null) : slide.bgMode === "global" ? (state.bgImage || null) : null,
     textColor: slide.textColor, titleColor: slide.titleColor, markColor: slide.markColor,
     texture: slide.texture, textureTone: slide.textureTone, textureOpacity: slide.textureOpacity, pattern: slide.pattern,
@@ -925,6 +955,94 @@ function buildSingleSlider(slide, key, text, min, max, def, unit) {
   num.addEventListener("input", () => apply(num.value, "num"));
   return div;
 }
+// Generic version of buildSingleSlider: writes to any object/onChange pair instead
+// of a slide's own _send (used by the caption editor, which edits either the
+// Global caption-style object or a per-slide one with the same widget).
+function buildObjSlider(obj, key, text, min, max, def, onChange) {
+  const div = document.createElement("div"); div.style.marginTop = "6px"; div.style.fontSize = "12px";
+  const cur = obj[key] != null ? obj[key] : def;
+  div.innerHTML =
+    `<div style="color:var(--text-soft);margin-bottom:2px">${text}</div>` +
+    `<div class="slider-with-num"><input type="range" min="${min}" max="${max}" value="${cur}"/>` +
+    `<input type="number" class="num-input" min="${min}" max="${max}" value="${cur}"/></div>`;
+  const range = div.querySelector('input[type="range"]'), num = div.querySelector('input[type="number"]');
+  const apply = (v, from) => {
+    let val = parseInt(v, 10); if (!Number.isFinite(val)) return;
+    val = Math.max(min, Math.min(max, val));
+    obj[key] = val;
+    if (from !== "range") range.value = val;
+    if (from !== "num") num.value = val;
+    onChange();
+  };
+  range.addEventListener("input", () => apply(range.value, "range"));
+  num.addEventListener("input", () => apply(num.value, "num"));
+  return div;
+}
+// Optional colour field (native picker + "Default" chip that clears to "" = inherit
+// theme colour). Deliberately simpler than buildColorControl (no eyedropper/hex/rgb/
+// swatches): buildColorControl eagerly WRITES a resolved hex into obj[key] the moment
+// it's built (fine for background fills, which are never blank) — reusing it here
+// would silently convert a caption's "inherit theme colour" into a fixed colour the
+// instant the card renders, before the user touched anything.
+function buildOptionalColorField(obj, key, labelText, onChange) {
+  const wrap = document.createElement("div"); wrap.className = "color-field";
+  const input = document.createElement("input"); input.type = "color"; input.value = obj[key] || "#F7B400";
+  const def = document.createElement("button"); def.type = "button"; def.className = "chip sm" + (obj[key] ? "" : " active"); def.textContent = "Default";
+  input.addEventListener("input", () => { obj[key] = input.value; def.classList.remove("active"); onChange(); });
+  def.addEventListener("click", () => { obj[key] = ""; def.classList.add("active"); onChange(); });
+  wrap.appendChild(input); wrap.appendChild(def);
+  return labeled(labelText, wrap);
+}
+
+/* Full caption typography editor: size, weight, font, alignment, colour, line
+ * height, letter spacing, top/bottom margin (distance from the image) and padding.
+ * Reused identically for Global caption settings and a per-slide override — `cs` is
+ * whichever object owns the fields, `onChange` persists + repaints appropriately. */
+function buildCaptionEditor(cs, onChange) {
+  const wrap = document.createElement("div"); wrap.className = "cap-editor";
+
+  const r1 = document.createElement("div"); r1.className = "opt-row";
+  r1.appendChild(labeled("Ketebalan", dropdown(CAP_WEIGHTS, String(cs.weight), (id) => { cs.weight = id; onChange(); })));
+  r1.appendChild(labeled("Perataan", dropdown(CAP_ALIGNS, cs.align, (id) => { cs.align = id; onChange(); })));
+  wrap.appendChild(r1);
+
+  const r2 = document.createElement("div"); r2.className = "opt-row";
+  r2.appendChild(labeled("Font", dropdown(CAP_FONTS, cs.font, (id) => { cs.font = id; onChange(); })));
+  r2.appendChild(buildOptionalColorField(cs, "color", "Warna Font", onChange));
+  wrap.appendChild(r2);
+
+  const r3 = document.createElement("div"); r3.className = "opt-row";
+  r3.appendChild(buildObjSlider(cs, "size", "Ukuran font (px)", 14, 72, 38, onChange));
+  r3.appendChild(buildObjSlider(cs, "lineHeight", "Tinggi baris (%)", 100, 220, 132, onChange));
+  wrap.appendChild(r3);
+
+  const r4 = document.createElement("div"); r4.className = "opt-row";
+  r4.appendChild(buildObjSlider(cs, "letterSpacing", "Spasi huruf (px)", -4, 16, 0, onChange));
+  r4.appendChild(buildObjSlider(cs, "padding", "Padding (px)", 0, 60, 0, onChange));
+  wrap.appendChild(r4);
+
+  const r5 = document.createElement("div"); r5.className = "opt-row";
+  r5.appendChild(buildObjSlider(cs, "marginTop", "Margin atas — jarak dari gambar (px)", 0, 140, 24, onChange));
+  r5.appendChild(buildObjSlider(cs, "marginBottom", "Margin bawah (px)", 0, 140, 24, onChange));
+  wrap.appendChild(r5);
+
+  return wrap;
+}
+// Mode switch (per slide): inherit the Global caption style, or define this slide's
+// own. Rebuilds the card on mode switch (new controls appear/disappear); the editor
+// itself only re-sends the preview, so typing in a slider never reloads other cards.
+function buildCaptionStyleBlock(slide, hintText) {
+  const box = document.createElement("div");
+  const modes = [{ id: "", label: "Ikut Pengaturan Global" }, { id: "custom", label: "Custom slide ini" }];
+  box.appendChild(dropdown(modes, slide.capStyleMode, (id) => { slide.capStyleMode = id; rebuildCard(slide); }));
+  if (slide.capStyleMode === "custom") {
+    const note = document.createElement("div"); note.className = "field-hint";
+    note.textContent = "Gaya caption slide ini terpisah dari Pengaturan Global.";
+    box.appendChild(note);
+    box.appendChild(buildCaptionEditor(slide.capStyle, () => slide._send && slide._send()));
+  }
+  return labeled("Gaya Caption", box, hintText);
+}
 
 function buildCard(slide, idx) {
   const card = document.createElement("div"); card.className = "slide-card" + (slide.id === activeCardId ? "" : " collapsed"); card.dataset.id = slide.id;
@@ -1058,6 +1176,11 @@ function buildCard(slide, idx) {
     inp.addEventListener("input", () => { slide[f.key] = inp.value; slide._send && slide._send(); });
     col.appendChild(labeled(f.label, inp, f.hint));
   });
+  // Meme caption typography (size/weight/font/colour/alignment/spacing/margins) —
+  // applies to both the top and bottom caption of this slide.
+  if (slide.type === "meme") {
+    advInner.appendChild(buildCaptionStyleBlock(slide, "Berlaku untuk caption atas & bawah meme."));
+  }
 
   // Regular-image placeholder (non-meme layouts): an ordinary image shown inside the
   // slide, with an optional caption displayed underneath it.
@@ -1071,6 +1194,7 @@ function buildCard(slide, idx) {
     capInput.addEventListener("input", () => { slide.imageCaption = capInput.value; slide._send && slide._send(); });
     imgWrap.appendChild(capInput);
     advInner.appendChild(labeled("Gambar (opsional)", imgWrap, "Muncul di dalam slide, dengan caption di bawahnya."));
+    advInner.appendChild(buildCaptionStyleBlock(slide, "Berlaku untuk caption di bawah gambar."));
   }
 
   // Background IMAGE source: none / global (inherits Pengaturan Global) / custom

@@ -298,12 +298,15 @@
 
 /* meme */
 .stage[data-type="meme"] .stage-body { align-items: stretch; gap: 26px; }
-.stage .meme-cap { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 40px; line-height: 1.18; text-align: center; }
+/* Base caption typography — a fallback only; app.js always supplies a resolved
+ * capStyle (Global default or a per-slide Custom override) which sets these as
+ * inline styles and wins. Bumped up from the old fixed sizes for readability. */
+.stage .meme-cap { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 38px; line-height: 1.32; text-align: center; }
 .stage .meme-frame { border-radius: 26px; overflow: hidden; border: 8px solid #fff; background: #fff; box-shadow: 0 26px 60px rgba(0,0,0,0.45); max-height: 720px; display: flex; }
 .stage .meme-frame img { width: 100%; height: 100%; object-fit: contain; display: block; max-height: 704px; }
 .stage[data-theme="light"] .meme-cap { color: var(--ink); }
 /* Caption under a regular (non-meme) image. */
-.stage .img-caption { font-weight: 600; font-size: 26px; line-height: 1.4; text-align: center; margin-top: 16px; opacity: 0.92; white-space: pre-line; }
+.stage .img-caption { font-weight: 800; font-size: 38px; line-height: 1.32; text-align: center; margin-top: 24px; margin-bottom: 24px; white-space: pre-line; }
 .stage[data-theme="light"] .img-caption { color: var(--ink-soft); }
 
 /* compare (2-column) */

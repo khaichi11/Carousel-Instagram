@@ -71,8 +71,27 @@
     });
     wrap.appendChild(card);
   }
+  // Apply the caption typography config (size/weight/font/colour/alignment/line
+  // height/letter spacing/margins/padding) as inline styles, so it always wins over
+  // the CSS class defaults and is picked up by the PPTX exporter's computed-style
+  // read. Falsy/blank fields (color:"" , font:"") are left untouched so the theme's
+  // own colour and the CSS class's own font-family still apply — that's what makes
+  // "" mean "inherit / theme default" instead of a random fallback.
+  function applyCapStyle(node, cs) {
+    if (!cs) return;
+    if (cs.size) node.style.fontSize = cs.size + "px";
+    if (cs.weight) node.style.fontWeight = String(cs.weight);
+    if (cs.font) node.style.fontFamily = "'" + cs.font + "', sans-serif";
+    if (cs.color) node.style.color = cs.color;
+    if (cs.align) node.style.textAlign = cs.align;
+    if (cs.lineHeight) node.style.lineHeight = String(cs.lineHeight / 100);
+    if (cs.letterSpacing != null) node.style.letterSpacing = cs.letterSpacing + "px";
+    if (cs.marginTop != null) node.style.marginTop = cs.marginTop + "px";
+    if (cs.marginBottom != null) node.style.marginBottom = cs.marginBottom + "px";
+    if (cs.padding != null) node.style.padding = cs.padding + "px";
+  }
   function buildMeme(d, wrap) {
-    if (d.capTop) wrap.appendChild(el("div", "meme-cap top", inline(d.capTop, true)));
+    if (d.capTop) { var capT = el("div", "meme-cap top", inline(d.capTop, true)); applyCapStyle(capT, d.capStyle); wrap.appendChild(capT); }
     if (d.image) {
       var frame = el("div", "meme-frame");
       var img = document.createElement("img");
@@ -81,7 +100,7 @@
       frame.appendChild(img);
       wrap.appendChild(frame);
     }
-    if (d.capBottom) wrap.appendChild(el("div", "meme-cap bottom", inline(d.capBottom, true)));
+    if (d.capBottom) { var capB = el("div", "meme-cap bottom", inline(d.capBottom, true)); applyCapStyle(capB, d.capStyle); wrap.appendChild(capB); }
   }
   function itemsArr(s) { return (s || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean); }
 
@@ -259,7 +278,7 @@
       iImg.style.transform = "translate(" + ((d.imgX||50)-50) + "%, " + ((d.imgY||50)-50) + "%) scale(" + ((d.imgZoom||100)/100) + ")";
       imgFrame.appendChild(iImg);
       wrap.appendChild(imgFrame);
-      if (d.imageCaption) wrap.appendChild(el("div", "img-caption", inline(d.imageCaption, true)));
+      if (d.imageCaption) { var iCap = el("div", "img-caption", inline(d.imageCaption, true)); applyCapStyle(iCap, d.capStyle); wrap.appendChild(iCap); }
     }
 
     body.appendChild(wrap);

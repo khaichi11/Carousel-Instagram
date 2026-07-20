@@ -337,3 +337,6 @@ details.adv .inner { padding: 2px 2px 14px; }
   .slide-card { scroll-margin-top: 70px; }
 }
 .opt-row.three { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Caption typography editor (Global + per-slide override) */
+.cap-editor { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
