@@ -192,11 +192,15 @@ input[type="range"]:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(247,180
   .card-grid { grid-template-columns: 1fr; }
   .preview-col { flex-direction: row; position: static; }
   .settings-grid, .opt-row, .example-box { grid-template-columns: 1fr; }
-  .app-header { position: static; padding: 14px 16px; align-items: flex-start; }
+  /* Stack the header vertically so the brand and the action buttons each get a
+     full-width row instead of fighting for space in a cramped side-by-side layout. */
+  .app-header { position: static; padding: 14px 16px; flex-direction: column; align-items: stretch; gap: 12px; }
   .brand img { height: 34px; }
   .brand h1 { font-size: 18px; }
   .brand p { font-size: 12px; }
-  .header-actions { width: 100%; justify-content: flex-end; }
+  .header-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
+  /* Buttons share the row evenly and wrap cleanly on very narrow screens. */
+  .header-actions .btn { flex: 1 1 auto; justify-content: center; padding: 11px 16px; }
   main { padding: 18px 16px 40px; }
   .action-bar {
     position: static;
@@ -329,8 +333,8 @@ details.adv .inner { padding: 2px 2px 14px; }
 .dropzone .placeholder { font-weight: 600; }
 
 @media (max-width: 860px) {
-  .project-bar { max-width: 160px; }
-  .header-actions { flex-wrap: wrap; gap: 6px; }
+  /* Project name + save status sit on their own full-width row above the buttons. */
+  .project-bar { flex-direction: row; align-items: center; gap: 8px; max-width: 100%; flex-basis: 100%; margin-right: 0; }
   .tpl-grid { grid-template-columns: 1fr 1fr; }
   .opt-row.three { grid-template-columns: 1fr; }
   .slide-nav { top: 0; } /* header is static on small screens */

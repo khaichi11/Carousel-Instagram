@@ -96,7 +96,7 @@
       var frame = el("div", "meme-frame");
       var img = document.createElement("img");
       img.src = d.image;
-      img.style.transform = "translate(" + ((d.imgX||50)-50) + "%, " + ((d.imgY||50)-50) + "%) scale(" + ((d.imgZoom||100)/100) + ")";
+      img.style.transform = "translate(" + ((d.imgX ?? 50)-50) + "%, " + ((d.imgY ?? 50)-50) + "%) scale(" + ((d.imgZoom||100)/100) + ")";
       frame.appendChild(img);
       wrap.appendChild(frame);
     }
@@ -152,7 +152,7 @@
     var col = el("div", "fig-col");
     if (d.figureLayer === "front") col.style.zIndex = "4";
     var sc = (d.figScale || 100) / 100;
-    var t = "translate(" + ((d.figX || 50) - 50) + "%, " + ((d.figY || 50) - 50) + "%) rotate(" + (d.figRotate || 0) + "deg) scale(" + sc * (d.figFlip ? -1 : 1) + ", " + sc + ")";
+    var t = "translate(" + ((d.figX ?? 50) - 50) + "%, " + ((d.figY ?? 50) - 50) + "%) rotate(" + (d.figRotate || 0) + "deg) scale(" + sc * (d.figFlip ? -1 : 1) + ", " + sc + ")";
     var op = (d.figOpacity == null ? 100 : d.figOpacity) / 100;
     var fig;
     if (d.figureImage) {
@@ -222,7 +222,7 @@
       stage.classList.add("has-bg");
       var photoImg = document.createElement("img");
       photoImg.className = "bg-photo-img"; photoImg.alt = ""; photoImg.src = d.bgImage;
-      photoImg.style.objectPosition = (d.bgX || 50) + "% " + (d.bgY || 50) + "%";
+      photoImg.style.objectPosition = (d.bgX ?? 50) + "% " + (d.bgY ?? 50) + "%";
       photoImg.style.transform = "scale(" + ((d.bgZoom || 100) / 100) + ")";
       stage.querySelector(".bg-photo").appendChild(photoImg);
     }
@@ -234,7 +234,7 @@
     
     var pattern = stage.querySelector(".bg-pattern");
     if (d.pattern) {
-      pattern.style.transform = "translate(" + ((d.patternX||50)-50) + "%, " + ((d.patternY||50)-50) + "%) scale(" + ((d.patternScale||100)/100) + ")";
+      pattern.style.transform = "translate(" + ((d.patternX ?? 50)-50) + "%, " + ((d.patternY ?? 50)-50) + "%) scale(" + ((d.patternScale||100)/100) + ")";
     }
     var grain = stage.querySelector(".grain");
     // Procedurally generated textures (paper/fabric/noise/grain) — a tileable grayscale
@@ -245,10 +245,10 @@
       grain.style.backgroundImage = "url('" + texUrl + "')";
       grain.style.backgroundRepeat = "repeat";
       grain.style.backgroundSize = Math.round(512 * ((d.textureScale || 100) / 100)) + "px";
-      grain.style.backgroundPosition = (d.textureX || 50) + "% " + (d.textureY || 50) + "%";
+      grain.style.backgroundPosition = (d.textureX ?? 50) + "% " + (d.textureY ?? 50) + "%";
       if (d.textureOpacity != null) grain.style.opacity = Math.max(0, Math.min(100, d.textureOpacity)) / 100;
     } else if (d.texture) {
-      grain.style.transform = "translate(" + ((d.textureX||50)-50) + "%, " + ((d.textureY||50)-50) + "%) scale(" + ((d.textureScale||100)/100) + ")";
+      grain.style.transform = "translate(" + ((d.textureX ?? 50)-50) + "%, " + ((d.textureY ?? 50)-50) + "%) scale(" + ((d.textureScale||100)/100) + ")";
     }
 
     stage.querySelector(".logo-chip img").src = d.logo || "";
@@ -275,7 +275,7 @@
       imgFrame.style.marginTop = "24px";
       var iImg = document.createElement("img");
       iImg.src = d.image;
-      iImg.style.transform = "translate(" + ((d.imgX||50)-50) + "%, " + ((d.imgY||50)-50) + "%) scale(" + ((d.imgZoom||100)/100) + ")";
+      iImg.style.transform = "translate(" + ((d.imgX ?? 50)-50) + "%, " + ((d.imgY ?? 50)-50) + "%) scale(" + ((d.imgZoom||100)/100) + ")";
       imgFrame.appendChild(iImg);
       wrap.appendChild(imgFrame);
       if (d.imageCaption) { var iCap = el("div", "img-caption", inline(d.imageCaption, true)); applyCapStyle(iCap, d.capStyle); wrap.appendChild(iCap); }

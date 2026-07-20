@@ -904,7 +904,9 @@ function buildTransformControls(slide, prefix, label) {
   // Each control = a slider + a synced numeric input (type or drag; they stay in sync).
   const addSlider = (key, text, min, max, def) => {
     const div = document.createElement("div"); div.style.flex = "1";
-    const cur = slide[prefix + key] || def;
+    // Use ?? (not ||) so a stored 0 — a valid edge position — is shown as 0, not
+    // snapped back to the default (which made the top/left slider extremes dead).
+    const cur = slide[prefix + key] ?? def;
     div.innerHTML =
       `<div style="color:var(--text-soft);margin-bottom:2px">${text}</div>` +
       `<div class="slider-with-num"><input type="range" min="${min}" max="${max}" value="${cur}"/>` +
