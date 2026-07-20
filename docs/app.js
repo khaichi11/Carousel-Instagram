@@ -119,7 +119,7 @@ function freshSlide(base) {
       capStyleMode: "",
       figureImage: null, figureSide: "right", figureLayer: "back", figX: 50, figY: 50, figScale: 100, figRotate: 0, figFlip: false, figOpacity: 100,
       imgX: 50, imgY: 50, imgZoom: 100,
-      bgX: 50, bgY: 50, bgZoom: 100, textureX: 50, textureY: 50, textureScale: 100, patternX: 50, patternY: 50, patternScale: 100, _send: null },
+      bgX: 50, bgY: 50, bgZoom: 100, textureX: 50, textureY: 50, textureScale: 100, patternX: 50, patternY: 50, patternScale: 100, patternThickness: 2, _send: null },
     base
   );
   // Always give the slide its OWN caption-style object — Object.assign only shallow-
@@ -500,7 +500,7 @@ function slideData(slide, idx, logo) {
     bgZoom: slide.bgMode === "global" ? (state.settings.bgScale ?? 100) : (slide.bgScale ?? slide.bgZoom),
     imgX: slide.imgX, imgY: slide.imgY, imgZoom: slide.imgScale ?? slide.imgZoom,
     textureX: slide.textureX, textureY: slide.textureY, textureScale: slide.textureScale, 
-    patternX: slide.patternX, patternY: slide.patternY, patternScale: slide.patternScale,
+    patternX: slide.patternX, patternY: slide.patternY, patternScale: slide.patternScale, patternThickness: slide.patternThickness,
     font: state.settings.font, customFontUrl: state.settings.customFontUrl, ratio: state.settings.ratio,
     logo: logo || LOGO_DATAURL, index: idx + 1, total: state.slides.length,
     igHandle: state.settings.igHandle, website: state.settings.website,
@@ -1064,6 +1064,56 @@ function buildCaptionStyleBlock(slide, hintText) {
   return labeled("Gaya Caption", box, hintText);
 }
 
+/* ---------------- Preview lightbox: click a slide's live preview to see it big,
+ * with an X (or backdrop click / Escape) to close. One shared overlay + iframe is
+ * created lazily and reused for every slide (rendered via the same postMessage
+ * protocol as the small in-card previews), instead of a separate iframe per card. */
+let lightboxOverlay = null, lightboxFrame = null, lightboxWrap = null, lightboxFrameReady = false;
+function ensureLightbox() {
+  if (lightboxOverlay) return;
+  lightboxOverlay = document.createElement("div");
+  lightboxOverlay.className = "lightbox-overlay";
+  lightboxWrap = document.createElement("div"); lightboxWrap.className = "lightbox-frame-wrap";
+  lightboxFrame = document.createElement("iframe"); lightboxFrame.className = "lightbox-frame"; lightboxFrame.src = "template.html";
+  lightboxFrame.addEventListener("load", () => { lightboxFrameReady = true; });
+  lightboxWrap.appendChild(lightboxFrame);
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button"; closeBtn.className = "lightbox-close"; closeBtn.setAttribute("aria-label", "Tutup");
+  closeBtn.innerHTML = "&times;";
+  closeBtn.addEventListener("click", closeSlideLightbox);
+  lightboxOverlay.appendChild(lightboxWrap);
+  lightboxOverlay.appendChild(closeBtn);
+  // Click on the dark backdrop (not the frame itself) also closes it.
+  lightboxOverlay.addEventListener("click", (e) => { if (e.target === lightboxOverlay) closeSlideLightbox(); });
+  document.body.appendChild(lightboxOverlay);
+}
+function onLightboxKeydown(e) { if (e.key === "Escape") closeSlideLightbox(); }
+function closeSlideLightbox() {
+  if (!lightboxOverlay) return;
+  lightboxOverlay.classList.remove("open");
+  document.removeEventListener("keydown", onLightboxKeydown);
+}
+function showSlideLightbox(slide, idx) {
+  ensureLightbox();
+  let w = 1080, h = 1350;
+  if (state.settings.ratio === "1:1") h = 1080;
+  else if (state.settings.ratio === "3:4") h = 1440;
+  else if (state.settings.ratio === "9:16") h = 1920;
+  const maxW = window.innerWidth * 0.86, maxH = window.innerHeight * 0.86;
+  let wrapW = maxW, wrapH = wrapW * (h / w);
+  if (wrapH > maxH) { wrapH = maxH; wrapW = wrapH * (w / h); }
+  lightboxWrap.style.width = Math.round(wrapW) + "px";
+  lightboxWrap.style.height = Math.round(wrapH) + "px";
+  lightboxFrame.style.width = w + "px";
+  lightboxFrame.style.height = h + "px";
+  lightboxFrame.style.transform = "scale(" + (wrapW / w) + ")";
+  const send = () => { if (lightboxFrame.contentWindow) lightboxFrame.contentWindow.postMessage({ type: "render", data: slideData(slide, idx) }, "*"); };
+  if (lightboxFrameReady) send();
+  else lightboxFrame.addEventListener("load", send, { once: true });
+  lightboxOverlay.classList.add("open");
+  document.addEventListener("keydown", onLightboxKeydown);
+}
+
 function buildCard(slide, idx) {
   const card = document.createElement("div"); card.className = "slide-card" + (slide.id === activeCardId ? "" : " collapsed"); card.dataset.id = slide.id;
   const top = document.createElement("div"); top.className = "slide-card-top";
@@ -1121,11 +1171,12 @@ function buildCard(slide, idx) {
   applyAllPat.type = "button"; applyAllPat.className = "link-btn"; applyAllPat.textContent = "Terapkan ke semua";
   applyAllPat.title = "Pakai pattern & posisi ini di semua slide";
   applyAllPat.addEventListener("click", () => {
-    state.slides.forEach((s) => { s.pattern = slide.pattern; s.patternX = slide.patternX; s.patternY = slide.patternY; s.patternScale = slide.patternScale; });
+    state.slides.forEach((s) => { s.pattern = slide.pattern; s.patternX = slide.patternX; s.patternY = slide.patternY; s.patternScale = slide.patternScale; s.patternThickness = slide.patternThickness; });
     renderSlides();
   });
   patTools.appendChild(applyAllPat);
   patWrap.appendChild(patTools);
+  patWrap.appendChild(buildSingleSlider(slide, "patternThickness", "Tebal Garis", 1, 8, 2));
   patWrap.appendChild(buildTransformControls(slide, "pattern", ""));
   styleRow.appendChild(labeled("Garis / Pattern", patWrap));
 
@@ -1242,7 +1293,12 @@ function buildCard(slide, idx) {
   const prev = document.createElement("div"); prev.className = "preview-col";
   const frameWrap = document.createElement("div"); frameWrap.className = "preview-frame-wrap";
   const frame = document.createElement("iframe"); frame.className = "preview-frame"; frame.src = "template.html";
-  frameWrap.appendChild(frame); prev.appendChild(frameWrap);
+  frameWrap.appendChild(frame);
+  const zoomHint = document.createElement("div"); zoomHint.className = "preview-zoom-hint"; zoomHint.textContent = "🔍 Perbesar";
+  frameWrap.appendChild(zoomHint);
+  frameWrap.title = "Klik untuk perbesar";
+  frameWrap.addEventListener("click", () => showSlideLightbox(slide, idx));
+  prev.appendChild(frameWrap);
   const cap = document.createElement("span"); cap.className = "preview-cap"; cap.textContent = "Live preview"; prev.appendChild(cap);
   grid.appendChild(prev);
 

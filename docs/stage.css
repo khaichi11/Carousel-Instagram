@@ -80,7 +80,7 @@
 /* ---- Selectable pattern (garis) override ---- */
 /* A bit stronger than the theme-default pattern so a user-picked pattern is clearly
    visible the moment it is selected (was too subtle to notice on click). */
-.stage { --pat: rgba(255,255,255,0.12); }
+.stage { --pat: rgba(255,255,255,0.12); --pat-w: 2px; }
 .stage[data-theme="light"] { --pat: rgba(47,49,139,0.16); }
 .stage[data-pattern] .bg-pattern {
   opacity: 0.8;
@@ -89,19 +89,22 @@
   background-size: auto;
 }
 .stage[data-pattern="none"] .bg-pattern { display: none; background-image: none; }
+/* Line/dot/stroke thickness for every pattern comes from --pat-w (set inline from
+   the "Tebal garis" slider — see stage.js/app.js) so users can size it themselves
+   instead of it being fixed in CSS. */
 .stage[data-pattern="grid"] .bg-pattern {
-  background-image: linear-gradient(var(--pat) 1px, transparent 1px), linear-gradient(90deg, var(--pat) 1px, transparent 1px);
+  background-image: linear-gradient(var(--pat) var(--pat-w), transparent var(--pat-w)), linear-gradient(90deg, var(--pat) var(--pat-w), transparent var(--pat-w));
   background-size: 64px 64px;
 }
 .stage[data-pattern="dots"] .bg-pattern {
-  background-image: radial-gradient(var(--pat) 2.5px, transparent 2.5px);
+  background-image: radial-gradient(var(--pat) var(--pat-w), transparent var(--pat-w));
   background-size: 40px 40px;
 }
 .stage[data-pattern="diagonal"] .bg-pattern {
-  background-image: repeating-linear-gradient(45deg, var(--pat) 0 2px, transparent 2px 22px);
+  background-image: repeating-linear-gradient(45deg, var(--pat) 0 var(--pat-w), transparent var(--pat-w) 22px);
 }
 .stage[data-pattern="waves"] .bg-pattern {
-  background-image: radial-gradient(circle at 50% 100%, transparent 18px, var(--pat) 19px 20px, transparent 21px);
+  background-image: radial-gradient(circle at 50% 100%, transparent calc(19.5px - (var(--pat-w) / 2) - 1px), var(--pat) calc(19.5px - (var(--pat-w) / 2)) calc(19.5px + (var(--pat-w) / 2)), transparent calc(19.5px + (var(--pat-w) / 2) + 1px));
   background-size: 64px 32px;
 }
 

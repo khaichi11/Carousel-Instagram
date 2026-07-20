@@ -245,6 +245,9 @@
     var pattern = stage.querySelector(".bg-pattern");
     if (d.pattern) {
       pattern.style.transform = "translate(" + ((d.patternX ?? 50)-50) + "%, " + ((d.patternY ?? 50)-50) + "%) scale(" + ((d.patternScale||100)/100) + ")";
+      // Line/dot thickness for the selected pattern (grid/dots/diagonal/waves) — a
+      // user-settable px value read by stage.css via the --pat-w custom property.
+      stage.style.setProperty("--pat-w", Math.max(0.5, d.patternThickness || 2) + "px");
     }
     var grain = stage.querySelector(".grain");
     // Procedurally generated textures (paper/fabric/noise/grain) — a tileable grayscale
