@@ -28,20 +28,41 @@ function open() {
       if (!db.objectStoreNames.contains("content")) db.createObjectStore("content", { keyPath: "id" });
       if (!db.objectStoreNames.contains("assets")) db.createObjectStore("assets", { keyPath: "hash" });
     };
-    q.onsuccess = () => res(q.result);
+    q.onsuccess = () => {
+      const db = q.result;
+      // The connection can go bad after we've cached it — another tab clearing site
+      // data, the browser evicting storage under pressure, etc. Without this, every
+      // autosave after that point would silently fail forever (dbPromise still points
+      // at the dead connection, so open() keeps handing it out). Dropping the cache
+      // here means the next call transparently opens a fresh connection instead.
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      db.onclose = () => { dbPromise = null; };
+      res(db);
+    };
     q.onerror = () => { dbPromise = null; rej(q.error); };
   });
   return dbPromise;
 }
-async function tx(stores, mode, fn) {
+async function tx(stores, mode, fn, _retried) {
   const db = await open();
-  return new Promise((res, rej) => {
-    const t = db.transaction(stores, mode);
-    const out = fn.length > 1 ? fn(...stores.map((s) => t.objectStore(s))) : fn(t.objectStore(stores[0]));
-    t.oncomplete = () => res(out && out.__req ? out.__req.result : out);
-    t.onerror = () => rej(t.error);
-    t.onabort = () => rej(t.error);
-  });
+  try {
+    return await new Promise((res, rej) => {
+      const t = db.transaction(stores, mode);
+      const out = fn.length > 1 ? fn(...stores.map((s) => t.objectStore(s))) : fn(t.objectStore(stores[0]));
+      t.oncomplete = () => res(out && out.__req ? out.__req.result : out);
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
+  } catch (e) {
+    // A connection that goes bad after we've cached it (browser storage eviction,
+    // another tab clearing site data, an unexpected close) makes db.transaction()
+    // throw and every future call would keep hitting the same dead connection —
+    // silently breaking autosave for the rest of the session. Transactions are
+    // atomic (a failed one never partially wrote), so it's safe to drop the cached
+    // connection and retry once with a fresh one before giving up.
+    if (!_retried) { dbPromise = null; return tx(stores, mode, fn, true); }
+    throw e;
+  }
 }
 function reqAll(store, method, arg) {
   const r = arg === undefined ? store[method]() : store[method](arg);

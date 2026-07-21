@@ -1,6 +1,6 @@
 import { parseBrief } from "./import-brief.js?v=22";
 import { downloadPptx } from "./pptx-export.js?v=22";
-import * as store from "./storage.js?v=22";
+import * as store from "./storage.js?v=23";
 import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=24";
 import { listPromptTemplates, loadTemplate, generatePrompt } from "./prompt-engine.js?v=2";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
@@ -207,11 +207,19 @@ function autoMeta() {
     thumb: current.thumb, appVersion: 13,
   };
 }
+let autosaveFailCount = 0; // consecutive failures — drives the "autosave gagal" warning below
 function updateSaveBadge() {
   const b = document.getElementById("saveBadge");
   if (!b) return;
   const t = (d) => d ? new Date(d).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "";
-  if (current.dirty) {
+  // A failing autosave used to leave the badge frozen on its last successful
+  // timestamp forever — indistinguishable from "still working" — so a broken backup
+  // (storage full, connection dropped, browser storage evicted, …) went unnoticed
+  // until the user lost work. Surface it explicitly instead of staying silent.
+  if (autosaveFailCount > 0) {
+    b.textContent = "⚠ Autosave gagal — perubahan belum ke-backup";
+    b.className = "save-badge dirty";
+  } else if (current.dirty) {
     b.textContent = current.lastAuto ? `• Belum disimpan — autosave ${t(current.lastAuto)}` : "• Belum disimpan";
     b.className = "save-badge dirty";
   } else if (current.lastManual) {
@@ -236,9 +244,14 @@ async function autosaveNow() {
   try {
     await store.saveProject(autoMeta(), snapshot());
     current.lastAuto = Date.now();
+    autosaveFailCount = 0;
     updateSaveBadge();
     checkStorage();
-  } catch (e) { console.warn("Autosave gagal:", e); }
+  } catch (e) {
+    console.warn("Autosave gagal:", e);
+    autosaveFailCount++;
+    updateSaveBadge();
+  }
 }
 setInterval(() => { if (current.dirty) autosaveNow(); }, 15000); // safety-net interval
 
