@@ -200,17 +200,17 @@
 .stage mark {
   --mk: var(--mark-color, var(--gold-soft));
   background: linear-gradient(180deg, transparent 14%, var(--mk) 14% 86%, transparent 86%);
-  color: inherit; padding: 0 0.22em; border-radius: 4px;
+  color: var(--mark-text-color, inherit); padding: 0 0.22em; border-radius: 4px;
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
 .stage .display mark {
   --mk: var(--mark-color, var(--gold));
-  background: var(--mk); color: var(--navy-deep);
+  background: var(--mk); color: var(--mark-text-color, var(--navy-deep));
   padding: 0.08em 0.24em 0.06em; border-radius: 8px; line-height: 1.04;
   box-shadow: 0 0.08em 0 rgba(247,180,0,0.26);
 }
-.stage .statement mark { --mk: var(--mark-color, var(--gold-soft)); padding: 0.06em 0.24em; border-radius: 6px; }
-.stage[data-theme="light"] .statement mark { color: var(--ink); }
+.stage .statement mark { --mk: var(--mark-color, var(--gold-soft)); color: var(--mark-text-color, inherit); padding: 0.06em 0.24em; border-radius: 6px; }
+.stage[data-theme="light"] .statement mark { color: var(--mark-text-color, var(--ink)); }
 
 /* PPTX background mode: hide everything that is re-emitted above as its own editable
   object — words, highlight fills, cards/badges/frames, logos and footer handles —
@@ -351,4 +351,4 @@
 .stage[data-theme="photo"] .text-card .statement { color: var(--ink); }
 .stage[data-theme="photo"] .text-card .subtitle { color: var(--ink-soft); }
 .stage[data-theme="photo"] .text-card .eyebrow { margin-bottom: 20px; }
-.stage[data-theme="photo"] .text-card mark { color: var(--navy-deep); }
+.stage[data-theme="photo"] .text-card mark { color: var(--mark-text-color, var(--navy-deep)); }

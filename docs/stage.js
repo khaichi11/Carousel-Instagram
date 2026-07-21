@@ -184,7 +184,9 @@
     if (d.pattern) stage.setAttribute("data-pattern", d.pattern); else stage.removeAttribute("data-pattern");
     if (d.texture) stage.setAttribute("data-texture", d.texture); else stage.removeAttribute("data-texture");
     stage.style.removeProperty("--mark-color");
+    stage.style.removeProperty("--mark-text-color");
     stage.style.removeProperty("--text-color");
+    stage.style.removeProperty("--title-color");
     stage.style.removeProperty("--display-font");
     // custom aspect ratio
     var w = 1080, h = 1350;
@@ -205,6 +207,7 @@
     }
 
     if (d.markColor) stage.style.setProperty("--mark-color", d.markColor);
+    if (d.highlightTextColor) stage.style.setProperty("--mark-text-color", d.highlightTextColor);
     if (d.textColor) { stage.style.setProperty("--text-color", d.textColor); stage.classList.add("has-text-color"); }
     if (d.titleColor) { stage.style.setProperty("--title-color", d.titleColor); stage.classList.add("has-title-color"); }
     if (d.font) stage.style.setProperty("--display-font", "'" + d.font + "'");

@@ -1,7 +1,8 @@
-import { parseBrief } from "./import-brief.js?v=14";
-import { downloadPptx } from "./pptx-export.js?v=14";
-import * as store from "./storage.js?v=14";
-import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=14";
+import { parseBrief } from "./import-brief.js?v=22";
+import { downloadPptx } from "./pptx-export.js?v=22";
+import * as store from "./storage.js?v=22";
+import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=24";
+import { listPromptTemplates, loadTemplate, generatePrompt } from "./prompt-engine.js?v=2";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -114,7 +115,7 @@ function freshSlide(base) {
   const s = Object.assign(
     { id: crypto.randomUUID(), type: "cover", theme: "dark", align: "", topic: "", eyebrow: "", title: "", subtitle: "", button: "",
       items: "", colA: "", itemsA: "", colB: "", itemsB: "", capTop: "", capBottom: "",
-      textColor: "", titleColor: "", markColor: "", texture: "", textureTone: "light", textureOpacity: 60, pattern: "", image: null, imageCaption: "", bgImage: null, bgMode: "",
+      textColor: "", titleColor: "", markColor: "", highlightTextColor: "", texture: "", textureTone: "light", textureOpacity: 60, pattern: "", image: null, imageCaption: "", bgImage: null, bgMode: "",
       bgColorMode: "", bgFillType: "solid", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
       capStyleMode: "",
       figureImage: null, figureSide: "right", figureLayer: "back", figX: 50, figY: 50, figScale: 100, figRotate: 0, figFlip: false, figOpacity: 100,
@@ -131,7 +132,7 @@ function freshSlide(base) {
 const state = {
   bgImage: null,
   briefText: "",
-  settings: { igHandle: "pastipintar", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5",
+  settings: { igHandle: "pastipintar.utbk", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5",
     bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
     bgX: 50, bgY: 50, bgScale: 100,
     capStyle: defaultCapStyle() },
@@ -490,7 +491,7 @@ function slideData(slide, idx, logo) {
     capTop: slide.capTop, capBottom: slide.capBottom, image: slide.image, imageCaption: slide.imageCaption,
     capStyle: resolveCapStyle(slide),
     bgImage: slide.bgMode === "custom" ? (slide.bgImage || null) : slide.bgMode === "global" ? (state.bgImage || null) : null,
-    textColor: slide.textColor, titleColor: slide.titleColor, markColor: slide.markColor,
+    textColor: slide.textColor, titleColor: slide.titleColor, markColor: slide.markColor, highlightTextColor: slide.highlightTextColor,
     texture: slide.texture, textureTone: slide.textureTone, textureOpacity: slide.textureOpacity, pattern: slide.pattern,
     // Global-mode slides inherit the GLOBAL image transform (position + zoom) so
     // every slide shows the background identically; custom mode keeps its own.
@@ -651,7 +652,7 @@ function renderGlobalBgEditor() {
   const tHost = document.getElementById("bgGlobalTransform");
   if (tHost) {
     tHost.innerHTML = "";
-    tHost.appendChild(buildTransformControls(state.settings, "bg", "Posisi & zoom gambar global (berlaku untuk semua slide global)"));
+    tHost.appendChild(buildTransformControls(state.settings, "bg", "Posisi & zoom gambar global (berlaku untuk semua slide global)", { alignments: true }));
   }
 }
 
@@ -764,6 +765,128 @@ document.querySelectorAll(".input-tab").forEach((tab) => {
     if (tab.dataset.mode === "text") briefGrow();
   });
 });
+
+/* ---- Clipboard & toast helpers ---- */
+async function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+  } else {
+    const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); document.body.removeChild(ta);
+  }
+}
+function showToast(message) {
+  const t = document.createElement("div");
+  t.className = "copy-toast";
+  t.textContent = message;
+  t.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy-deep);color:#fff;padding:12px 22px;border-radius:999px;font-weight:700;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,0.25);z-index:2000;animation:toastIn 0.2s ease;";
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity 0.25s ease"; setTimeout(() => t.remove(), 260); }, 2200);
+}
+
+/* ---- GPT Prompt Generator: form-based prompt builder with multiple templates ---- */
+const pgModal = document.getElementById("promptGeneratorModal");
+const pgTopic = document.getElementById("pgTopic");
+const pgAudience = document.getElementById("pgAudience");
+const pgSlides = document.getElementById("pgSlides");
+const pgGoal = document.getElementById("pgGoal");
+const pgTone = document.getElementById("pgTone");
+const pgExtra = document.getElementById("pgExtra");
+const pgTemplate = document.getElementById("pgTemplate");
+const pgPreviewBox = document.getElementById("pgPreviewBox");
+const pgPreview = document.getElementById("pgPreview");
+const pgCharCount = document.getElementById("pgCharCount");
+let pgCurrentTemplateText = "";
+
+function initPromptGenerator() {
+  pgTemplate.innerHTML = "";
+  listPromptTemplates().forEach((t) => {
+    const opt = document.createElement("option");
+    opt.value = t.id; opt.textContent = t.label;
+    pgTemplate.appendChild(opt);
+  });
+}
+
+function openPromptGenerator() {
+  pgModal.style.display = "flex";
+  pgModal.setAttribute("aria-hidden", "false");
+  pgTopic.focus();
+}
+
+function closePromptGenerator() {
+  pgModal.style.display = "none";
+  pgModal.setAttribute("aria-hidden", "true");
+}
+
+function resetPromptGenerator() {
+  pgTopic.value = "";
+  pgAudience.value = "";
+  pgSlides.value = "";
+  pgGoal.value = "";
+  pgTone.value = "";
+  pgExtra.value = "";
+  pgTemplate.selectedIndex = 0;
+  pgPreview.value = "";
+  pgPreviewBox.style.display = "none";
+  pgCharCount.textContent = "0 karakter";
+  pgCurrentTemplateText = "";
+}
+
+async function runPromptGenerator() {
+  const topic = pgTopic.value.trim();
+  if (!topic) { pgTopic.focus(); showToast("Topik wajib diisi."); return; }
+  const tplId = pgTemplate.value;
+  pgCurrentTemplateText = await loadTemplate(tplId);
+  if (!pgCurrentTemplateText) { showToast("Gagal memuat template prompt."); return; }
+  const inputs = {
+    topic,
+    targetAudience: pgAudience.value.trim(),
+    slides: pgSlides.value.trim(),
+    goal: pgGoal.value.trim(),
+    tone: pgTone.value.trim(),
+    extraInstructions: pgExtra.value.trim(),
+  };
+  const generated = generatePrompt(pgCurrentTemplateText, inputs);
+  pgPreview.value = generated;
+  pgPreviewBox.style.display = "block";
+  pgCharCount.textContent = generated.length.toLocaleString("id-ID") + " karakter";
+  pgPreview.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function copyGeneratedPrompt() {
+  const text = pgPreview.value.trim();
+  if (!text) { await runPromptGenerator(); }
+  try {
+    await copyToClipboard(pgPreview.value.trim());
+    showToast("Prompt copied successfully.");
+  } catch (e) {
+    showToast("Gagal menyalin prompt.");
+  }
+}
+
+async function openChatGPT() {
+  const text = pgPreview.value.trim();
+  if (!text) { await runPromptGenerator(); }
+  try {
+    await copyToClipboard(pgPreview.value.trim());
+    showToast("Prompt copied. Paste it into ChatGPT.");
+  } catch (e) {
+    showToast("Gagal menyalin prompt.");
+  }
+  window.open("https://chat.openai.com/", "_blank", "noopener,noreferrer");
+}
+
+document.getElementById("openPromptGeneratorBtn").addEventListener("click", openPromptGenerator);
+document.getElementById("pgCloseBtn").addEventListener("click", closePromptGenerator);
+document.getElementById("pgBackdrop")?.addEventListener("click", closePromptGenerator);
+document.getElementById("pgResetBtn").addEventListener("click", resetPromptGenerator);
+document.getElementById("pgGenerateBtn").addEventListener("click", runPromptGenerator);
+document.getElementById("pgCopyBtn").addEventListener("click", copyGeneratedPrompt);
+document.getElementById("pgOpenChatGptBtn").addEventListener("click", openChatGPT);
+pgModal.addEventListener("click", (e) => { if (e.target === pgModal || e.target.classList.contains("pg-backdrop")) closePromptGenerator(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && pgModal.style.display === "flex") closePromptGenerator(); });
+initPromptGenerator();
 
 /* ---- template gallery (additive presets; existing layouts untouched) ---- */
 function renderTemplateGallery() {
@@ -897,7 +1020,8 @@ function buildImageDropzone(slide, key, onChange, subtitle) {
   return dz;
 }
 
-function buildTransformControls(slide, prefix, label) {
+function buildTransformControls(slide, prefix, label, opts) {
+  opts = opts || {};
   const wrap = document.createElement("div"); wrap.className = "transform-ctrls";
   wrap.style.display = "flex"; wrap.style.gap = "10px"; wrap.style.marginTop = "4px"; wrap.style.fontSize = "12px";
 
@@ -935,6 +1059,32 @@ function buildTransformControls(slide, prefix, label) {
   addSlider("Y", "Y", 0, 100, 50);
   addSlider("Scale", "Size", 10, 300, 100);
 
+  // Quick-alignment chips (Canva-style) for image/background/figure positioning.
+  let alignRow = null;
+  if (opts.alignments) {
+    alignRow = document.createElement("div"); alignRow.className = "transform-align-row";
+    alignRow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;";
+    const setAlign = (x, y) => {
+      slide[prefix + "X"] = x; slide[prefix + "Y"] = y;
+      slide._send && slide._send();
+    };
+    const alignBtn = (text, x, y) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip sm";
+      b.textContent = text; b.style.fontSize = "11px";
+      b.addEventListener("click", () => setAlign(x, y));
+      return b;
+    };
+    alignRow.appendChild(alignBtn("↖ Kiri Atas", 0, 0));
+    alignRow.appendChild(alignBtn("↑ Atas", 50, 0));
+    alignRow.appendChild(alignBtn("↗ Kanan Atas", 100, 0));
+    alignRow.appendChild(alignBtn("← Kiri", 0, 50));
+    alignRow.appendChild(alignBtn("+ Tengah", 50, 50));
+    alignRow.appendChild(alignBtn("→ Kanan", 100, 50));
+    alignRow.appendChild(alignBtn("↙ Kiri Bawah", 0, 100));
+    alignRow.appendChild(alignBtn("↓ Bawah", 50, 100));
+    alignRow.appendChild(alignBtn("↘ Kanan Bawah", 100, 100));
+  }
+
   // "↺ Reset" restores X/Y/Size for this group to their defaults (50 / 50 / 100).
   const resetBtn = document.createElement("button");
   resetBtn.type = "button"; resetBtn.className = "link-btn"; resetBtn.textContent = "↺ Reset";
@@ -952,6 +1102,7 @@ function buildTransformControls(slide, prefix, label) {
   head.appendChild(lb); head.appendChild(resetBtn);
   container.appendChild(head);
   container.appendChild(wrap);
+  if (alignRow) container.appendChild(alignRow);
   return container;
 }
 // One labelled slider + synced numeric input for a single slide property.
@@ -1069,6 +1220,10 @@ function buildCaptionStyleBlock(slide, hintText) {
  * created lazily and reused for every slide (rendered via the same postMessage
  * protocol as the small in-card previews), instead of a separate iframe per card. */
 let lightboxOverlay = null, lightboxFrame = null, lightboxWrap = null, lightboxFrameReady = false;
+
+/* ---------------- PNG gallery lightbox: click a generated PNG thumbnail to see
+ * it full-screen with zoom, pan, and keyboard/mouse dismissal. */
+let imgLightboxOverlay = null, imgLightboxImg = null, imgLightboxScale = 1, imgLightboxPanning = false, imgLightboxStart = { x: 0, y: 0 }, imgLightboxTranslate = { x: 0, y: 0 };
 function ensureLightbox() {
   if (lightboxOverlay) return;
   lightboxOverlay = document.createElement("div");
@@ -1112,6 +1267,71 @@ function showSlideLightbox(slide, idx) {
   else lightboxFrame.addEventListener("load", send, { once: true });
   lightboxOverlay.classList.add("open");
   document.addEventListener("keydown", onLightboxKeydown);
+}
+
+function ensureImageLightbox() {
+  if (imgLightboxOverlay) return;
+  imgLightboxOverlay = document.createElement("div");
+  imgLightboxOverlay.className = "img-lightbox-overlay";
+  imgLightboxOverlay.style.cssText = "display:none;position:fixed;inset:0;z-index:1001;background:rgba(10,10,26,0.92);align-items:center;justify-content:center;overflow:hidden;";
+  const wrap = document.createElement("div");
+  wrap.className = "img-lightbox-wrap";
+  wrap.style.cssText = "position:relative;max-width:92vw;max-height:92vh;cursor:grab;";
+  imgLightboxImg = document.createElement("img");
+  imgLightboxImg.style.cssText = "max-width:100%;max-height:92vh;display:block;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,0.55);transform-origin:center center;transition:transform 0.15s ease;";
+  wrap.appendChild(imgLightboxImg);
+  imgLightboxOverlay.appendChild(wrap);
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button"; closeBtn.className = "lightbox-close"; closeBtn.setAttribute("aria-label", "Tutup");
+  closeBtn.innerHTML = "&times;";
+  closeBtn.addEventListener("click", closeImageLightbox);
+  imgLightboxOverlay.appendChild(closeBtn);
+  const hint = document.createElement("div");
+  hint.className = "img-lightbox-hint";
+  hint.textContent = "Scroll / pinch untuk zoom · drag untuk geser · ESC atau klik luar untuk tutup";
+  imgLightboxOverlay.appendChild(hint);
+  document.body.appendChild(imgLightboxOverlay);
+
+  imgLightboxOverlay.addEventListener("click", (e) => { if (e.target === imgLightboxOverlay) closeImageLightbox(); });
+  imgLightboxOverlay.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    imgLightboxScale = Math.max(1, Math.min(6, imgLightboxScale * delta));
+    updateImageLightboxTransform();
+  }, { passive: false });
+  wrap.addEventListener("mousedown", (e) => {
+    if (imgLightboxScale <= 1) return;
+    imgLightboxPanning = true; imgLightboxStart = { x: e.clientX - imgLightboxTranslate.x, y: e.clientY - imgLightboxTranslate.y };
+    wrap.style.cursor = "grabbing";
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!imgLightboxPanning) return;
+    imgLightboxTranslate = { x: e.clientX - imgLightboxStart.x, y: e.clientY - imgLightboxStart.y };
+    updateImageLightboxTransform();
+  });
+  window.addEventListener("mouseup", () => { imgLightboxPanning = false; wrap.style.cursor = "grab"; });
+}
+function updateImageLightboxTransform() {
+  if (!imgLightboxImg) return;
+  imgLightboxImg.style.transform = `translate(${imgLightboxTranslate.x}px, ${imgLightboxTranslate.y}px) scale(${imgLightboxScale})`;
+}
+function onImageLightboxKeydown(e) { if (e.key === "Escape") closeImageLightbox(); }
+function closeImageLightbox() {
+  if (!imgLightboxOverlay) return;
+  imgLightboxOverlay.classList.remove("open");
+  imgLightboxOverlay.style.display = "none";
+  imgLightboxScale = 1; imgLightboxTranslate = { x: 0, y: 0 };
+  if (imgLightboxImg) imgLightboxImg.style.transform = "scale(1)";
+  document.removeEventListener("keydown", onImageLightboxKeydown);
+}
+function showImageLightbox(src) {
+  ensureImageLightbox();
+  imgLightboxImg.src = src;
+  imgLightboxScale = 1; imgLightboxTranslate = { x: 0, y: 0 };
+  updateImageLightboxTransform();
+  imgLightboxOverlay.style.display = "flex";
+  imgLightboxOverlay.classList.add("open");
+  document.addEventListener("keydown", onImageLightboxKeydown);
 }
 
 function buildCard(slide, idx) {
@@ -1183,12 +1403,24 @@ function buildCard(slide, idx) {
   advInner.appendChild(styleRow);
 
   const colorRow = document.createElement("div"); colorRow.className = "opt-row";
+  colorRow.appendChild(colorField(slide, "textColor", "Warna Teks Reguler"));
   colorRow.appendChild(colorField(slide, "titleColor", "Warna Judul"));
-  colorRow.appendChild(colorField(slide, "textColor", "Warna Teks"));
   advInner.appendChild(colorRow);
   const colorRow2 = document.createElement("div"); colorRow2.className = "opt-row";
-  colorRow2.appendChild(colorField(slide, "markColor", "Warna Stabilo"));
+  colorRow2.appendChild(colorField(slide, "markColor", "Background Stabilo"));
+  colorRow2.appendChild(colorField(slide, "highlightTextColor", "Teks Stabilo"));
   advInner.appendChild(colorRow2);
+  const resetColorsBtn = document.createElement("button");
+  resetColorsBtn.type = "button"; resetColorsBtn.className = "link-btn";
+  resetColorsBtn.textContent = "Reset warna teks";
+  resetColorsBtn.addEventListener("click", () => {
+    slide.textColor = "";
+    slide.titleColor = "";
+    slide.markColor = "";
+    slide.highlightTextColor = "";
+    rebuildCard(slide);
+  });
+  advInner.appendChild(resetColorsBtn);
 
   // Background COLOUR per slide: theme default / global / custom override — with a
   // clear indicator of which source this slide is using.
@@ -1218,7 +1450,7 @@ function buildCard(slide, idx) {
       // Dedicated meme-image placeholder (meme layout).
       const imgWrap = document.createElement("div");
       imgWrap.appendChild(buildImageDropzone(slide, f.key, () => slide._send && slide._send(), "gambar meme — caption di atas & bawah"));
-      imgWrap.appendChild(buildTransformControls(slide, "img", "Posisi Gambar"));
+      imgWrap.appendChild(buildTransformControls(slide, "img", "Posisi Gambar", { alignments: true }));
       col.appendChild(labeled(f.label, imgWrap, f.hint));
       return;
     }
@@ -1230,7 +1462,7 @@ function buildCard(slide, idx) {
       rowF.appendChild(labeled("Posisi Figur", dropdown(FIGURE_SIDES, slide.figureSide, (id) => { slide.figureSide = id; slide._send && slide._send(); })));
       rowF.appendChild(labeled("Layer", dropdown(FIGURE_LAYERS, slide.figureLayer, (id) => { slide.figureLayer = id; slide._send && slide._send(); })));
       wrapF.appendChild(rowF);
-      wrapF.appendChild(buildTransformControls(slide, "fig", "Geser & Skala Figur"));
+      wrapF.appendChild(buildTransformControls(slide, "fig", "Geser & Skala Figur", { alignments: true }));
       wrapF.appendChild(buildSingleSlider(slide, "figRotate", "Rotasi (°)", -180, 180, 0));
       wrapF.appendChild(buildSingleSlider(slide, "figOpacity", "Opacity", 0, 100, 100));
       const flipBtn = document.createElement("button");
@@ -1258,7 +1490,7 @@ function buildCard(slide, idx) {
   if (slide.type !== "meme") {
     const imgWrap = document.createElement("div");
     imgWrap.appendChild(buildImageDropzone(slide, "image", () => slide._send && slide._send(), "gambar biasa di dalam slide"));
-    imgWrap.appendChild(buildTransformControls(slide, "img", "Posisi Gambar"));
+    imgWrap.appendChild(buildTransformControls(slide, "img", "Posisi Gambar", { alignments: true }));
     const capInput = document.createElement("input"); capInput.type = "text";
     capInput.value = slide.imageCaption || ""; capInput.placeholder = "Caption di bawah gambar (opsional)";
     capInput.style.marginTop = "8px";
@@ -1278,7 +1510,7 @@ function buildCard(slide, idx) {
     note.textContent = "Slide ini memakai gambar background-nya sendiri (menimpa global).";
     bgWrap.appendChild(note);
     bgWrap.appendChild(buildImageDropzone(slide, "bgImage", () => slide._send && slide._send(), "background khusus slide ini"));
-    bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background"));
+    bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background", { alignments: true }));
   } else if (slide.bgMode === "global") {
     const note = document.createElement("div"); note.className = "field-hint";
     note.textContent = state.bgImage
@@ -1384,13 +1616,18 @@ function renderSlides() {
 }
 // Replace ONE card in place — dropdown changes must not rebuild the other cards
 // (that reloaded every preview iframe and looked like a full app reset).
+// We also preserve the open/closed state of any <details> groups so the settings
+// panel doesn't disappear from under the user while they're editing.
 function rebuildCard(slide) {
   const idx = state.slides.findIndex((s) => s.id === slide.id);
   const old = slidesListEl.querySelector('.slide-card[data-id="' + slide.id + '"]');
   if (idx < 0 || !old) { renderSlides(); return; }
   markDirty();
   activeCardId = slide.id; // the card being edited stays the expanded one
-  slidesListEl.replaceChild(buildCard(slide, idx), old);
+  const detailsState = [...old.querySelectorAll("details.adv")].map((d) => d.open);
+  const newCard = buildCard(slide, idx);
+  newCard.querySelectorAll("details.adv").forEach((d, i) => { if (detailsState[i]) d.open = true; });
+  slidesListEl.replaceChild(newCard, old);
   renderSlideNav();
 }
 function refreshAll() { state.slides.forEach((s) => { try { s._send && s._send(); } catch (e) { console.warn("refresh slide gagal:", e); } }); }
@@ -1624,7 +1861,11 @@ function renderGallery() {
   gallery.innerHTML = "";
   lastPngs.forEach((src, i) => {
     const item = document.createElement("div"); item.className = "gallery-item";
-    item.innerHTML = `<a href="${src}" target="_blank"><img src="${src}" alt="Slide ${i + 1}" /></a><div class="gi-footer"><span>Slide ${i + 1}</span><a class="link-btn" href="${src}" download="slide-${i + 1}.png">Download</a></div>`;
+    const thumb = document.createElement("img"); thumb.src = src; thumb.alt = `Slide ${i + 1}`; thumb.style.cursor = "zoom-in";
+    thumb.addEventListener("click", () => showImageLightbox(src));
+    const footer = document.createElement("div"); footer.className = "gi-footer";
+    footer.innerHTML = `<span>Slide ${i + 1}</span><a class="link-btn" href="${src}" download="slide-${i + 1}.png">Download</a>`;
+    item.appendChild(thumb); item.appendChild(footer);
     gallery.appendChild(item);
   });
   const has = lastPngs.length > 0;
@@ -1795,6 +2036,12 @@ function collectPptx(stage, markHex, data, igIconPng) {
     const font = cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim();
     const weight = parseInt(cs.fontWeight) || 400;
     const baseColor = rgbToHex(cs.color);
+    // display/section-title use a condensed ALL-CAPS display font (Anton/Bebas/Oswald)
+    // that PowerPoint/Canva/LibreOffice can't render (never embedded in practice) — the
+    // substituted fallback renders the same uppercase text ~35-55% WIDER, so highlight
+    // boxes sized to the original glyph width overflow (e.g. the last letter spilling
+    // outside its stabilo box). Give those elements much more horizontal slack.
+    const isCondensedDisplay = node.classList.contains("display") || node.classList.contains("section-title");
 
     const flat = [];
     (function walk(n, mk, bold, fontSize) {
@@ -1853,7 +2100,13 @@ function collectPptx(stage, markHex, data, igIconPng) {
       // colour comes from the RENDERED style (dark-theme statement marks stay white)
       const color = isMark ? rgbToHex(getComputedStyle(sgm.mk).color) : baseColor;
       const padH = 6 * k;
-      const slack = Math.min(160, Math.max(24, w * 0.3));
+      // No meaningful cap for condensed-display fragments: these boxes are invisible
+      // and a full headline fragment can be 800-1700px wide, so a small flat cap gets
+      // hit long before the % factor does (that's what let "JANGAN PILIH JURUSAN" /
+      // "GENGSI" overflow even with the factor bumped up).
+      const slackFactor = isCondensedDisplay ? 0.75 : 0.3;
+      const slackCap = isCondensedDisplay ? 1400 : 160;
+      const slack = Math.min(slackCap, Math.max(24, w * slackFactor));
       els.push({
         x: safeNum(isMark ? x - slack / 2 : x - 2), y: safeNum(y - padH / 2),
         w: safeNum(w + slack), h: safeNum(h + padH),
@@ -1883,21 +2136,35 @@ function collectPptx(stage, markHex, data, igIconPng) {
     const lsRaw = cs.letterSpacing;
     const letterSpacingPx = (lsRaw && lsRaw !== "normal") ? parseFloat(lsRaw) * k : 0;
     const isDisplay = node.classList.contains("display") || node.classList.contains("statement") || node.classList.contains("section-title");
+    // display/section-title use a condensed ALL-CAPS display font (Anton/Bebas/Oswald)
+    // that's essentially never actually rendered by the viewer (Canva never honours
+    // embedded PPTX fonts; PowerPoint/LibreOffice only do if the exact font happens to
+    // be installed locally) — the substituted fallback is both notably wider AND has
+    // taller line metrics at the same point size, so these get extra slack below.
+    const isCondensedDisplay = node.classList.contains("display") || node.classList.contains("section-title");
     const isBadge = node.classList.contains("list-ic") || node.classList.contains("rank");
     const isSmall = node.classList.contains("eyebrow") || node.classList.contains("pill-btn") || node.classList.contains("counter");
     const padW = (isBadge ? 0 : isDisplay ? 12 : isSmall ? 8 : 6) * k;
     const padH = (isBadge ? 0 : isDisplay ? 12 : isSmall ? 6 : 6) * k;
     const fontPx = clamp(safeNum(parseFloat(cs.fontSize), 18) * k, 8, 220);
     const linePxRaw = parseFloat(cs.lineHeight);
-    const linePx = (Number.isFinite(linePxRaw) ? linePxRaw : fontPx * 1.15) * k;
+    // small safety margin on the line pitch so a substituted font's taller ascent/
+    // descent (typical for fallback UI fonts vs. a tight condensed display face)
+    // doesn't overlap the next line — a few px of extra drift beats visible overlap.
+    const linePx = (Number.isFinite(linePxRaw) ? linePxRaw : fontPx * 1.15) * k * (isCondensedDisplay ? 1.08 : 1);
     runs.forEach((run) => { if (run.fontSize) run.fontSize *= k; });
     const elemMarkHex = (markHex || (isDisplay ? "F7B400" : "FFD65A")).replace("#", "");
     const centered = CENTER_CLASSES.some((c) => node.classList.contains(c));
     const align = centered ? "center" : (cs.textAlign.indexOf("center") >= 0 ? "center" : (cs.textAlign.indexOf("right") >= 0 || cs.textAlign.indexOf("end") >= 0) ? "right" : "left");
     // Widen the box (anchored on its alignment) so a slightly wider substituted font
-    // can't re-wrap the hard-broken lines; the box itself is invisible.
+    // can't re-wrap the hard-broken lines; the box itself is invisible. Measured
+    // against real fallback fonts, condensed-display uppercase text comes out
+    // ~35-55% wider, so it needs far more slack than body/badge text or it silently
+    // re-wraps and overlaps the next line.
     let bx = box.x - padW / 2, bw = box.w + padW;
-    const slack = Math.min(140, Math.max(16, bw * 0.18));
+    const slackFactor = isCondensedDisplay ? 0.75 : 0.18;
+    const slackCap = isCondensedDisplay ? 1400 : 140;
+    const slack = Math.min(slackCap, Math.max(16, bw * slackFactor));
     if (align === "center") { bx -= slack / 2; bw += slack; }
     else if (align === "right") { bx -= slack; }
     bw += align === "center" ? 0 : slack;
@@ -1916,6 +2183,10 @@ function collectPptx(stage, markHex, data, igIconPng) {
       linePx: safeNum(linePx, fontPx * 1.15),
       charSpacing: clamp(safeNum(letterSpacingPx, 0), -2, 8),
       markText: contrastHex(elemMarkHex), markFill: elemMarkHex,
+      // Last-resort safety net: if the substituted font is even wider/taller than the
+      // measured margin above accounts for, let PowerPoint shrink the text to fit
+      // its box instead of overflowing/overlapping the next element.
+      autofit: isCondensedDisplay,
     });
   });
 
@@ -2110,12 +2381,12 @@ async function renderSlideForPptx(data) {
   const igPng = await getIgIconPng(exportStage);
   const { els, blocks, images } = collectPptx(exportStage, markHex, data, igPng);
 
-  // Single background raster underneath (gradient/photo/texture/pattern + baked
-  // pills/logo/footer). All words, cards, badges and images are hidden here and
-  // re-emitted above as separate editable objects.
-  exportStage.classList.add("pptx-bg");
+  // Pixel-perfect PPTX: the slide background is a full raster of the rendered
+  // stage (text, shapes, images and all). Editable objects are then layered on
+  // top as transparent overlays so users can still click/select/edit in
+  // PowerPoint / Canva, but the visible output is guaranteed to match the Live
+  // Preview regardless of font substitution or metric differences.
   const bg = await stageToPng(w, h);
-  exportStage.classList.remove("pptx-bg");
 
   return { bg, els, blocks, images, width: w, height: h };
 }
@@ -2136,13 +2407,13 @@ downloadPptxBtn.addEventListener("click", async () => {
     // Version + time in the filename so a fresh export can't be confused with an
     // older download of the same name sitting in the Downloads folder.
     const t = new Date();
-    const fname = `carousel-pastipintar-v14-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
+    const fname = `carousel-pastipintar-v15-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
     try {
       await downloadPptx(specs, fname);
     } catch (e) {
       throw new Error(`Gagal saat menyusun PPTX (PptxGenJS): ${e.stack || e.message}`);
     }
-    statusMsg.textContent = `PPTX selesai (build v14) → ${fname}. Tampilannya sama kayak render, semua teks editable (upload ke Canva / buka di PowerPoint).`; statusMsg.className = "status-msg ok";
+    statusMsg.textContent = `PPTX selesai (build v15) → ${fname}. Tampilan pixel-perfect sama kayak preview — teks & gambar tetap editable di Canva/PowerPoint.`; statusMsg.className = "status-msg ok";
   } catch (err) { statusMsg.textContent = "Error PPTX: " + err.message; statusMsg.className = "status-msg error"; console.error(err); }
   finally { downloadPptxBtn.disabled = false; }
 });

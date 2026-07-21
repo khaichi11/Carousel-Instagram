@@ -6,8 +6,8 @@
 <title>Pasti Pintar — Carousel Studio</title>
 <link rel="icon" href="logo/logo.png" />
 <link rel="stylesheet" href="fonts.css" />
-<link rel="stylesheet" href="stage.css?v=21" />
-<link rel="stylesheet" href="style.css?v=21" />
+<link rel="stylesheet" href="stage.css?v=25" />
+<link rel="stylesheet" href="style.css?v=25" />
 </head>
 <body class="stage-scope">
 
@@ -62,6 +62,7 @@
       <textarea id="briefEditor" class="brief-editor" spellcheck="false" placeholder="Tulis atau tempel naskah carousel-mu di sini…&#10;&#10;=== Slide ===&#10;judul: Judul slide pertama — **kata** jadi stabilo&#10;sub: Kalimat pendukung&#10;&#10;=== Slide ===&#10;judul: Slide kedua&#10;- poin satu&#10;- poin dua"></textarea>
       <div class="brief-toolbar">
         <span class="field-hint" id="briefCount"></span>
+        <button type="button" class="link-btn" id="openPromptGeneratorBtn">✨ Generate with ChatGPT</button>
         <button type="button" class="link-btn" id="loadExampleToEditorBtn">Muat contoh ke editor</button>
         <button type="button" class="btn btn-primary" id="buildFromTextBtn">Buat Slide dari Teks</button>
       </div>
@@ -116,7 +117,7 @@
     <div class="settings-grid">
       <div class="settings-fields">
         <label>Handle Instagram</label>
-        <input type="text" id="igInput" placeholder="pastipintar" />
+        <input type="text" id="igInput" placeholder="pastipintar.utbk" />
         <label>Website</label>
         <input type="text" id="webInput" placeholder="pastipintar.id" />
       </div>
@@ -205,11 +206,73 @@
   <div class="stage" id="exportStage"></div>
 </div>
 
+<!-- GPT Prompt Generator modal -->
+<div id="promptGeneratorModal" class="pg-modal" style="display:none" aria-hidden="true">
+  <div class="pg-backdrop"></div>
+  <div class="pg-dialog" role="dialog" aria-modal="true" aria-labelledby="pgTitle">
+    <button type="button" class="pg-close" id="pgCloseBtn" aria-label="Tutup">&times;</button>
+    <h2 id="pgTitle">Generate with ChatGPT</h2>
+    <p class="pg-subtitle">Isi form singkat, kami susun prompt lengkapnya. Kamu tinggal paste ke ChatGPT.</p>
+
+    <div class="pg-form">
+      <div class="pg-field">
+        <label for="pgTopic">Topik <span class="pg-required">*</span></label>
+        <input type="text" id="pgTopic" placeholder="Contoh: Cara menghadapi UTBK tanpa burnout" />
+      </div>
+      <div class="pg-row">
+        <div class="pg-field">
+          <label for="pgAudience">Target Audience</label>
+          <input type="text" id="pgAudience" placeholder="Pelajar SMA, pejuang UTBK…" />
+        </div>
+        <div class="pg-field">
+          <label for="pgSlides">Jumlah Slide</label>
+          <input type="text" id="pgSlides" placeholder="5-7" />
+        </div>
+      </div>
+      <div class="pg-row">
+        <div class="pg-field">
+          <label for="pgGoal">Tujuan</label>
+          <input type="text" id="pgGoal" placeholder="Edukasi, motivasi, promosi…" />
+        </div>
+        <div class="pg-field">
+          <label for="pgTone">Tone</label>
+          <input type="text" id="pgTone" placeholder="Motivasi edukatif, santai, formal…" />
+        </div>
+      </div>
+      <div class="pg-field">
+        <label for="pgTemplate">Template Prompt</label>
+        <select id="pgTemplate"></select>
+      </div>
+      <div class="pg-field">
+        <label for="pgExtra">Instruksi Tambahan</label>
+        <textarea id="pgExtra" rows="3" placeholder="Tambahan gaya, contoh, atau hal yang harus dihindari…"></textarea>
+      </div>
+    </div>
+
+    <div class="pg-actions">
+      <button type="button" class="btn btn-ghost" id="pgResetBtn">Reset</button>
+      <button type="button" class="btn btn-primary" id="pgGenerateBtn">Generate Prompt</button>
+    </div>
+
+    <div class="pg-preview" id="pgPreviewBox" style="display:none">
+      <div class="pg-preview-head">
+        <label>Hasil Prompt</label>
+        <span class="pg-char-count" id="pgCharCount">0 karakter</span>
+      </div>
+      <textarea id="pgPreview" class="pg-preview-text" rows="8" spellcheck="false"></textarea>
+      <div class="pg-preview-actions">
+        <button type="button" class="btn btn-secondary" id="pgCopyBtn">📋 Copy Prompt</button>
+        <button type="button" class="btn btn-dark" id="pgOpenChatGptBtn">Open ChatGPT</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="textures.js?v=14"></script>
-<script src="stage.js?v=21"></script>
+<script src="stage.js?v=25"></script>
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=21"></script>
+<script type="module" src="app.js?v=25"></script>
 </body>
 </html>

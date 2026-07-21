@@ -26,19 +26,21 @@ export async function downloadPptx(specs, fileName) {
   specs.forEach((spec) => {
     const s = pptx.addSlide();
 
-    // 1. background raster (no words, no cards, no images)
+    // 1. Full-slide raster background — this is the pixel-perfect visual layer.
+    //    It already contains text, shapes, images, effects, and the correct fonts
+    //    rendered by the browser, so the exported slide looks identical everywhere.
     s.addImage({ data: spec.bg, x: 0, y: 0, w: layoutW, h: layoutH });
 
-    // 2. editable shapes (cards, table rows, badges, image frames)
+    // 2. Editable shape overlays (cards, badges, frames, etc.) — kept transparent
+    //    so the raster background shows through, but users can still select/move
+    //    them in PowerPoint / Canva and change their fill if they want to.
     (spec.blocks || []).forEach((blk) => {
       const x = Number(blk.x), y = Number(blk.y), w = Number(blk.w), h = Number(blk.h);
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
-      // rectRadius only applies to roundRect (plain rect silently ignores it) and is
-      // measured in INCHES; cap at half the short side so pill shapes become capsules.
       const radPx = Math.max(0, Math.min(Number(blk.roundness) || 0, Math.min(w, h) / 2));
       const opts = {
         x: x * PX, y: y * PX, w: w * PX, h: h * PX,
-        fill: blk.fill,
+        fill: { color: "FFFFFF", transparency: 100 },
         line: { type: "none" },
       };
       if (blk.rotate) opts.rotate = normRot(blk.rotate);
@@ -46,7 +48,9 @@ export async function downloadPptx(specs, fileName) {
       s.addShape(radPx > 0.5 ? pptx.ShapeType.roundRect : pptx.ShapeType.rect, opts);
     });
 
-    // 3. editable images (placed at their visible object-fit rect — full picture, no crop)
+    // 3. Editable image overlays (meme/regular pictures, logo, figure) — placed at
+    //    their visible rect so users can replace them. They sit on top of the same
+    //    picture baked into the background, so the visual stays perfect.
     (spec.images || []).forEach((img) => {
       const x = Number(img.x), y = Number(img.y), w = Number(img.w), h = Number(img.h);
       if (!img.src || ![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
@@ -57,7 +61,10 @@ export async function downloadPptx(specs, fileName) {
       s.addImage(o);
     });
 
-    // 4. editable text boxes (one per text element), with run-level stabilo highlight
+    // 4. Editable text overlays — same content/font/size/position as the preview,
+    //    but rendered transparent so the raster background text remains visible.
+    //    Users can click the text area and edit; the embedded fonts ensure the
+    //    edited text still uses the intended typeface.
     (spec.els || []).forEach((el) => {
       const x = Number(el.x), y = Number(el.y), w = Number(el.w), h = Number(el.h);
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
@@ -69,8 +76,6 @@ export async function downloadPptx(specs, fileName) {
           color: r.mark ? el.markText : el.color,
           breakLine: !!r.br,
         };
-        // Highlighter is drawn as a separate editable box behind the text (see
-        // collectPptx), so no run-level highlight here — just the readable text colour.
         if (r.fontSize) opts.fontSize = Math.max(6, r.fontSize * 0.75);
         return { text: r.text || "", options: opts };
       });
@@ -88,10 +93,6 @@ export async function downloadPptx(specs, fileName) {
         paraSpaceBefore: 0, paraSpaceAfter: 0,
       };
       if (el.rotate) opts.rotate = normRot(el.rotate);
-      // EXACT line spacing (pt) pins every line to the same y as the browser preview
-      // even when the viewer substitutes a font with different metrics. A multiple
-      // would scale the substituted font's own line height and drift per line —
-      // which is what pushed the stabilo boxes off their words. Fallback: multiple.
       if (Number.isFinite(el.linePx) && el.linePx > 0) opts.lineSpacing = Math.round(el.linePx * 0.75 * 100) / 100;
       else opts.lineSpacingMultiple = Math.min(2.5, Math.max(0.7, el.lineh || 1.15));
 
@@ -108,6 +109,12 @@ export async function downloadPptx(specs, fileName) {
   let blob;
   try { blob = await pptx.write({ outputType: "blob" }); }
   catch (e) { await pptx.writeFile({ fileName: name }); return; } // fallback
+
+  try {
+    blob = await makeTextTransparent(blob);
+  } catch (e) {
+    console.warn("Text transparency skipped:", e && e.message);
+  }
 
   try {
     blob = await embedFonts(blob, families);
@@ -133,6 +140,39 @@ async function fetchBuf(path) { const r = await fetch(path); if (!r.ok) throw ne
 function triggerDownload(blob, name) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* Post-process the generated .pptx so the editable text overlays are transparent.
+ * The slide background already contains a pixel-perfect raster of the text, so the
+ * overlay text must not be visible. We add <a:alpha val="1000"/> (100% transparent)
+ * to every text run's solid fill inside <a:rPr> / <a:defRPr>. Shape fills are in
+ * <a:spPr> and are left untouched. */
+async function makeTextTransparent(blob) {
+  const JSZip = window.JSZip;
+  if (!JSZip) return blob;
+  const zip = await JSZip.loadAsync(blob);
+  const slideFiles = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+  const addAlpha = (m, attrs, inner) => {
+    const patched = inner.replace(
+      /<a:solidFill>\s*<a:srgbClr val="([0-9A-Fa-f]{6})"\s*\/>\s*<\/a:solidFill>/g,
+      '<a:solidFill><a:srgbClr val="$1"><a:alpha val="1000"/></a:srgbClr></a:solidFill>'
+    );
+    return patched === inner ? m : `<a:rPr${attrs}>${patched}</a:rPr>`;
+  };
+  const addAlphaDef = (m, attrs, inner) => {
+    const patched = inner.replace(
+      /<a:solidFill>\s*<a:srgbClr val="([0-9A-Fa-f]{6})"\s*\/>\s*<\/a:solidFill>/g,
+      '<a:solidFill><a:srgbClr val="$1"><a:alpha val="1000"/></a:srgbClr></a:solidFill>'
+    );
+    return patched === inner ? m : `<a:defRPr${attrs}>${patched}</a:defRPr>`;
+  };
+  for (const f of slideFiles) {
+    let xml = await zip.file(f).async("string");
+    xml = xml.replace(/<a:rPr([^>]*)>([\s\S]*?)<\/a:rPr>/g, addAlpha);
+    xml = xml.replace(/<a:defRPr([^>]*)>([\s\S]*?)<\/a:defRPr>/g, addAlphaDef);
+    zip.file(f, xml);
+  }
+  return await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
 }
 
 /* Post-process the generated .pptx (a zip) to embed the fonts so the editable text
