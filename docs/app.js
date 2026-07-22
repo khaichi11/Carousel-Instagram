@@ -255,7 +255,7 @@ function autoMeta() {
     id: "auto_" + (current.savedId || current.draftId), kind: "auto",
     of: current.savedId, name: current.name,
     createdAt: current.createdAt, updatedAt: Date.now(), autosavedAt: Date.now(),
-    thumb: current.thumb, appVersion: 14,
+    thumb: current.thumb, appVersion: 15,
   };
 }
 let autosaveFailCount = 0; // consecutive failures — drives the "autosave gagal" warning below
@@ -318,7 +318,7 @@ async function manualSave(asNew) {
   await ensureThumb();
   await store.saveProject({
     id, kind: "saved", name, createdAt, updatedAt: Date.now(),
-    autosavedAt: current.lastAuto, thumb: current.thumb, appVersion: 14,
+    autosavedAt: current.lastAuto, thumb: current.thumb, appVersion: 15,
   }, snapshot());
   // the old draft's autosave row now belongs to the saved id
   if (!current.savedId || asNew) await store.deleteProject("auto_" + (current.savedId || current.draftId)).catch(() => {});
@@ -364,6 +364,15 @@ function applyProject(meta, content) {
     if (!(meta.appVersion >= 14)) {
       if (content.settings && !content.settings.bgFit) content.settings.bgFit = "cover";
       (content.slides || []).forEach((s) => { if (s && !s.bgFit) s.bgFit = "cover"; });
+    }
+    // The footer handle used to default to the bare "pastipintar"; the account is
+    // @pastipintar.utbk. Projects saved with the old default carry the stale value
+    // inside them (it overrides the app default on load), so rename it once here.
+    // Gated on the save version, so anyone who deliberately types "pastipintar"
+    // AFTER this build keeps it — the rename only ever touches older saves.
+    if (!(meta.appVersion >= 15) && content.settings &&
+        (content.settings.igHandle || "").trim().toLowerCase() === "pastipintar") {
+      content.settings.igHandle = "pastipintar.utbk";
     }
     Object.assign(state.settings, content.settings || {});
     state.bgImage = content.bgImage || null;
