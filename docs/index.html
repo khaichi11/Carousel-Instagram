@@ -6,8 +6,8 @@
 <title>Pasti Pintar — Carousel Studio</title>
 <link rel="icon" href="logo/logo.png" />
 <link rel="stylesheet" href="fonts.css" />
-<link rel="stylesheet" href="stage.css?v=25" />
-<link rel="stylesheet" href="style.css?v=25" />
+<link rel="stylesheet" href="stage.css?v=26" />
+<link rel="stylesheet" href="style.css?v=26" />
 </head>
 <body class="stage-scope">
 
@@ -149,6 +149,11 @@
           <label>Warna / gradasi global</label>
           <div id="globalBgFill"></div>
         </div>
+        <div class="field" style="margin-top:14px">
+          <label>Overlay &amp; efek gambar global</label>
+          <span class="field-hint">Buat gambar yang <b>kesilauan</b>: tumpuk warna gelap (multiply/darken), gradasi, vignette, atau blur — teks jadi kebaca tanpa ganti fotonya. Dipakai slide yang mode overlay-nya <b>Global</b>.</span>
+          <div id="globalBgFx"></div>
+        </div>
       </div>
     </details>
 
@@ -212,9 +217,14 @@
   <div class="pg-dialog" role="dialog" aria-modal="true" aria-labelledby="pgTitle">
     <button type="button" class="pg-close" id="pgCloseBtn" aria-label="Tutup">&times;</button>
     <h2 id="pgTitle">Generate with ChatGPT</h2>
-    <p class="pg-subtitle">Isi form singkat, kami susun prompt lengkapnya. Kamu tinggal paste ke ChatGPT.</p>
+    <p class="pg-subtitle">Dua cara: isi <b>form singkat</b>, atau tempel naskah/hasil brainstorming kamu di <b>editor naskah</b>. Dua-duanya menghasilkan prompt siap paste ke ChatGPT.</p>
 
-    <div class="pg-form">
+    <div class="pg-tabs" role="tablist">
+      <button type="button" class="pg-tab active" data-pg-mode="form">📝 Form Cepat</button>
+      <button type="button" class="pg-tab" data-pg-mode="editor">📄 Editor Naskah</button>
+    </div>
+
+    <div class="pg-form" id="pgFormPane">
       <div class="pg-field">
         <label for="pgTopic">Topik <span class="pg-required">*</span></label>
         <input type="text" id="pgTopic" placeholder="Contoh: Cara menghadapi UTBK tanpa burnout" />
@@ -249,6 +259,53 @@
       </div>
     </div>
 
+    <!-- Editor naskah: tempel hasil brainstorming/ngobrol sama GPT, lalu dibungkus
+         prompt berbahasa Indonesia yang sudah berisi aturan format brief. -->
+    <div class="pg-form" id="pgEditorPane" style="display:none">
+      <div class="pg-field">
+        <label for="pgEditorTemplate">Naskahnya mau diapain?</label>
+        <select id="pgEditorTemplate"></select>
+        <span class="pg-note" id="pgEditorNote"></span>
+      </div>
+      <div class="pg-field">
+        <label for="pgMaterial">Naskah / Hasil Brainstorming <span class="pg-required">*</span></label>
+        <textarea id="pgMaterial" class="pg-material" rows="10" spellcheck="false" placeholder="Tempel di sini hasil ngobrol/brainstorming kamu sama ChatGPT, catatan materi, atau draft naskah carousel — bebas berantakan, nanti dirapikan sama promptnya."></textarea>
+        <div class="pg-editor-tools">
+          <span class="pg-char-count" id="pgMaterialCount">0 karakter</span>
+          <button type="button" class="link-btn" id="pgInsertFormatBtn">+ Sisipkan kerangka format</button>
+          <button type="button" class="link-btn" id="pgFromBriefBtn">Ambil dari Editor Konten</button>
+          <button type="button" class="link-btn" id="pgToBriefBtn">Kirim ke Editor Konten →</button>
+        </div>
+      </div>
+      <div class="pg-row">
+        <div class="pg-field">
+          <label for="pgEdSlides">Jumlah Slide</label>
+          <input type="text" id="pgEdSlides" placeholder="5-7" />
+        </div>
+        <div class="pg-field">
+          <label for="pgEdTone">Tone</label>
+          <input type="text" id="pgEdTone" placeholder="Motivasi edukatif, santai, formal…" />
+        </div>
+      </div>
+      <details class="adv">
+        <summary>Aturan format naskah (Bahasa Indonesia)</summary>
+        <div class="inner">
+          <p class="hint">Ini format yang dimengerti tombol <b>Buat Slide dari Teks</b>. Prompt di atas sudah menyuruh ChatGPT menulis persis format ini — panduan berikut buat kamu yang mau nulis/edit manual.</p>
+          <ul class="pg-rules">
+            <li>Pisah tiap slide pakai baris <code>=== Slide ===</code>. Baris diawali <code>//</code> = catatan, diabaikan.</li>
+            <li><code>layout:</code> cover · highlight · list · table · compare · meme · figure · cta</li>
+            <li><code>theme:</code> dark (navy) / light (terang) · <code>align:</code> top / center / bottom</li>
+            <li><code>topik:</code> badge pil kuning kanan atas · <code>eyebrow:</code> label kecil miring di atas judul</li>
+            <li><code>judul:</code> teks utama · <code>sub:</code> kalimat pendukung · <code>tombol:</code> tombol pil kuning</li>
+            <li>Stabilo: bungkus kata penting pakai <code>**kata**</code></li>
+            <li>List: tiap poin diawali <code>-</code>, boleh <code>Judul :: penjelasan</code> · Tabel: <code>Nama :: Angka</code></li>
+            <li>Komparasi: <code>kiri:</code> lalu poinnya, terus <code>kanan:</code> lalu poinnya</li>
+            <li>Meme: <code>captop:</code> dan <code>capbawah:</code> (gambarnya di-upload di editor slide)</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+
     <div class="pg-actions">
       <button type="button" class="btn btn-ghost" id="pgResetBtn">Reset</button>
       <button type="button" class="btn btn-primary" id="pgGenerateBtn">Generate Prompt</button>
@@ -269,10 +326,10 @@
 </div>
 
 <script src="textures.js?v=14"></script>
-<script src="stage.js?v=25"></script>
+<script src="stage.js?v=26"></script>
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=26"></script>
+<script type="module" src="app.js?v=27"></script>
 </body>
 </html>

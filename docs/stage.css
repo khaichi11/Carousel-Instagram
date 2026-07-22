@@ -23,6 +23,11 @@
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   color: #fff;
   background: #101138;
+  /* Confine every mix-blend-mode inside the slide (.bg-overlay, .grain) to the
+     slide's own layers, so a blend can never reach the page/iframe background
+     behind the stage. The stage paints an opaque background of its own, so this
+     does not change how anything already looked. */
+  isolation: isolate;
 }
 
 /* ---------- Background layers ---------- */
@@ -31,6 +36,11 @@
 .stage .bg-gradient { position: absolute; inset: 0; }
 .stage .bg-pattern { position: absolute; inset: -100%; opacity: 0.5; }
 .stage .scrim { position: absolute; inset: 0; display: none; }
+/* Colour/gradient overlay on top of the background (photo + theme gradient +
+   pattern), under every piece of content. Off unless a slide configures one;
+   stage.js fills in background / mix-blend-mode / opacity inline. Used to tame a
+   too-bright photo (darken/multiply), tint it, or fade it out towards the text. */
+.stage .bg-overlay { position: absolute; inset: 0; display: none; pointer-events: none; }
 /* .grain is placed LAST in the stage's DOM (see stage.js) AND given the highest
    z-index in the stage (stage-top/foot use 6, stage-body uses 5 — see below) so it
    paints in front of every other layer — background photo, uploaded image, cards
@@ -196,11 +206,15 @@
 .stage[data-theme="light"] .subtitle { color: var(--ink-soft); }
 
 /* Highlighter (stabilo): text-color stays readable, box fully contains the text,
-   and generous line-height keeps a highlighted line from touching the line above. */
+   and generous line-height keeps a highlighted line from touching the line above.
+   The DEFAULT highlighted-text colour is dark ink, never `inherit`: the slide's own
+   text is white, and white-on-yellow-stabilo was unreadable (and disagreed with the
+   PPTX export, which has always picked a contrasting colour). A user-chosen
+   --mark-text-color still overrides it. */
 .stage mark {
   --mk: var(--mark-color, var(--gold-soft));
   background: linear-gradient(180deg, transparent 14%, var(--mk) 14% 86%, transparent 86%);
-  color: var(--mark-text-color, inherit); padding: 0 0.22em; border-radius: 4px;
+  color: var(--mark-text-color, var(--navy-deep)); padding: 0 0.22em; border-radius: 4px;
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
 .stage .display mark {
@@ -209,7 +223,7 @@
   padding: 0.08em 0.24em 0.06em; border-radius: 8px; line-height: 1.04;
   box-shadow: 0 0.08em 0 rgba(247,180,0,0.26);
 }
-.stage .statement mark { --mk: var(--mark-color, var(--gold-soft)); color: var(--mark-text-color, inherit); padding: 0.06em 0.24em; border-radius: 6px; }
+.stage .statement mark { --mk: var(--mark-color, var(--gold-soft)); color: var(--mark-text-color, var(--navy-deep)); padding: 0.06em 0.24em; border-radius: 6px; }
 .stage[data-theme="light"] .statement mark { color: var(--mark-text-color, var(--ink)); }
 
 /* PPTX background mode: hide everything that is re-emitted above as its own editable

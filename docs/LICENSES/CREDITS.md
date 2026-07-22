@@ -38,4 +38,30 @@ Teks lisisensi tiap library ada di `LICENSES/libraries/`.
 - **Texture/pattern & gradient** — dibuat pakai CSS/SVG di dalam kode ini sendiri,
   bukan gambar dari pihak lain, jadi bebas dipakai.
 
+## Ikon Instagram di footer slide
+
+**Bukan file download.** Ikonnya digambar langsung di kode (`docs/stage.js`, variabel
+`IG_ICON`) memakai tiga bentuk dasar SVG: satu kotak sudut-tumpul (`<rect rx="5">`),
+satu lingkaran di tengah, dan satu titik kecil di kanan atas — semuanya `stroke:
+currentColor` jadi warnanya ikut tema. Tidak ada berkas gambar Instagram di repo ini
+(cek: `find . -iname "*instagram*"` kosong), tidak ada request ke server Meta, dan
+tidak ada aset brand resmi (logo gradasi ungu-oranye) yang dipakai.
+
+Dua hal yang perlu dibedakan:
+
+- **Hak cipta (copyright)** — aman. Bentuk geometris sederhana seperti ini umumnya
+  tidak dilindungi hak cipta, dan gambarnya memang ditulis sendiri di source code,
+  bukan disalin dari berkas brand asset Instagram. Rendisi outline yang mirip juga
+  tersedia bebas di icon set open-source (mis. Feather/Lucide, lisensi MIT).
+- **Merek dagang (trademark)** — glif kamera Instagram tetap merek dagang milik Meta.
+  Memakainya untuk **menunjuk akun sendiri** ("ini handle IG kami") termasuk
+  penggunaan referensial yang lazim diizinkan. Yang harus dihindari: memakainya
+  sebagai logo/identitas produk sendiri, mengesankan carousel ini resmi/didukung
+  Instagram, atau memodifikasi logo gradasi resmi mereka.
+
+Pemakaian di sini — glif outline satu warna di dalam chip kuning, di sebelah handle
+sendiri, di footer slide — masuk kategori aman. Kalau mau 100% bebas dari isu merek
+dagang, kosongkan field handle Instagram atau ganti ikonnya jadi simbol netral
+(mis. hanya teks "@").
+
 Tidak ada watermark atau tanda copyright pihak ketiga yang tertanam di gambar hasil.

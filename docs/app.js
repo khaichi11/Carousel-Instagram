@@ -23,6 +23,12 @@ const THEMES = [{ id: "dark", label: "Navy" }, { id: "light", label: "Terang" }]
 // Background source per design — decoupled from the light/dark theme so any slide can
 // show a background image (global from settings, or a custom one for this slide).
 const BG_MODES = [{ id: "", label: "Tanpa" }, { id: "global", label: "Global" }, { id: "custom", label: "Custom" }];
+// How a background photo fills the slide. "contain" = the WHOLE picture is visible
+// (nothing cropped away) and the leftover area shows the slide's own background —
+// that's the default, so geser X/Y moves the real picture instead of panning a crop.
+// "cover" = the old fill-the-frame behaviour, kept for anyone who wants an edge-to-
+// edge photo (and used automatically for projects saved before this option existed).
+const BG_FITS = [{ id: "contain", label: "Utuh — gambar nggak dipotong" }, { id: "cover", label: "Isi penuh — dipotong biar full slide" }];
 const ALIGNS = [{ id: "", label: "Auto" }, { id: "top", label: "Atas" }, { id: "center", label: "Tengah" }, { id: "bottom", label: "Bawah" }];
 const FONTS = [
   { id: "Anton", label: "Anton" }, { id: "Bebas Neue", label: "Bebas Neue" }, { id: "Oswald", label: "Oswald" },
@@ -31,6 +37,49 @@ const FONTS = [
 const TEXTURES = [{ id: "", label: "Default" }, { id: "paper", label: "Paper" }, { id: "fabric", label: "Fabric" }, { id: "noise", label: "Noise" }, { id: "grain", label: "Grain" }, { id: "none", label: "Polos" }];
 const TEXTURE_TONES = [{ id: "light", label: "Terang" }, { id: "dark", label: "Gelap" }];
 const PATTERNS = [{ id: "", label: "Default" }, { id: "grid", label: "Grid" }, { id: "dots", label: "Dots" }, { id: "diagonal", label: "Garis" }, { id: "waves", label: "Waves" }, { id: "none", label: "Polos" }];
+
+/* ---------------- Background overlay & image effects ----------------
+ * Overlay = a colour/gradient sheet painted over the background (photo, theme
+ * gradient, pattern) and under all content, with its own blend mode — the fix for a
+ * photo that's too bright to read text on. Effects = a CSS filter chain on the
+ * background photo itself (blur/brightness/contrast/saturation/grayscale).
+ * Both live in one group ("Overlay & Efek") with the same Off / Global / Custom
+ * source switch used by background colour and background image. */
+const FX_MODES = [{ id: "", label: "Tanpa (mati)" }, { id: "global", label: "Global" }, { id: "custom", label: "Custom slide ini" }];
+const OV_TYPES = [
+  { id: "", label: "Tanpa overlay" },
+  { id: "solid", label: "Warna rata" },
+  { id: "linear", label: "Gradasi linear" },
+  { id: "radial", label: "Gradasi radial" },
+  { id: "vignette", label: "Vignette (gelap di pinggir)" },
+];
+const OV_BLENDS = [
+  { id: "normal", label: "Normal" }, { id: "multiply", label: "Multiply (gelapkan)" },
+  { id: "darken", label: "Darken" }, { id: "color-burn", label: "Color Burn (kontras gelap)" },
+  { id: "overlay", label: "Overlay (kontras)" }, { id: "soft-light", label: "Soft Light (lembut)" },
+  { id: "hard-light", label: "Hard Light" }, { id: "screen", label: "Screen (terangkan)" },
+  { id: "lighten", label: "Lighten" }, { id: "luminosity", label: "Luminosity" },
+];
+// One-click starting points; each just fills the fields below, everything stays editable.
+const OV_PRESETS = [
+  { id: "darken", label: "🌑 Gelapkan", patch: { ovType: "solid", ovC1: "#000000", ovA1: 100, ovBlend: "multiply", ovOpacity: 45 } },
+  { id: "darker", label: "⬛ Gelap Pekat", patch: { ovType: "solid", ovC1: "#000000", ovA1: 100, ovBlend: "multiply", ovOpacity: 70 } },
+  { id: "bottom", label: "⬇ Gelap Bawah", patch: { ovType: "linear", ovAngle: 180, ovC1: "#000000", ovA1: 0, ovC2: "#050615", ovA2: 88, ovBlend: "normal", ovOpacity: 100 } },
+  { id: "top", label: "⬆ Gelap Atas", patch: { ovType: "linear", ovAngle: 180, ovC1: "#050615", ovA1: 88, ovC2: "#000000", ovA2: 0, ovBlend: "normal", ovOpacity: 100 } },
+  { id: "vignette", label: "⭕ Vignette", patch: { ovType: "vignette", ovC1: "#000000", ovA1: 85, ovBlend: "normal", ovOpacity: 100 } },
+  { id: "navy", label: "🔵 Navy Duotone", patch: { ovType: "linear", ovAngle: 155, ovC1: "#2F318B", ovA1: 90, ovC2: "#101138", ovA2: 90, ovBlend: "multiply", ovOpacity: 85 } },
+  { id: "warm", label: "🟡 Hangat", patch: { ovType: "linear", ovAngle: 155, ovC1: "#F7B400", ovA1: 70, ovC2: "#C24E00", ovA2: 70, ovBlend: "soft-light", ovOpacity: 100 } },
+  { id: "bright", label: "☀ Terangkan", patch: { ovType: "solid", ovC1: "#FFFFFF", ovA1: 100, ovBlend: "screen", ovOpacity: 30 } },
+];
+// The shape of the overlay + effect fields, on a slide (custom mode) and in settings
+// (global mode) alike. Kept in one place so defaults, reset and "off" agree.
+function defaultFx() {
+  return {
+    ovType: "", ovC1: "#000000", ovC2: "#000000", ovA1: 100, ovA2: 0, ovAngle: 180,
+    ovBlend: "multiply", ovOpacity: 45,
+    bgBlur: 0, bgBrightness: 100, bgContrast: 100, bgSaturate: 100, bgGrayscale: 0,
+  };
+}
 
 /* ---------------- Caption typography (regular-image & meme captions) ---------------- */
 const CAP_FONTS = [{ id: "", label: "Default" }, { id: "Plus Jakarta Sans", label: "Plus Jakarta Sans" }, { id: "Archivo", label: "Archivo" }].concat(FONTS);
@@ -113,10 +162,12 @@ function freshSlide(base) {
   // Migrate the old "photo" theme → dark theme + a background source.
   if (base.theme === "photo") { base = Object.assign({}, base, { theme: "dark", bgMode: base.bgImage ? "custom" : "global" }); }
   const s = Object.assign(
+    defaultFx(),
     { id: crypto.randomUUID(), type: "cover", theme: "dark", align: "", topic: "", eyebrow: "", title: "", subtitle: "", button: "",
+      fxMode: "",
       items: "", colA: "", itemsA: "", colB: "", itemsB: "", capTop: "", capBottom: "",
       textColor: "", titleColor: "", markColor: "", highlightTextColor: "", texture: "", textureTone: "light", textureOpacity: 60, pattern: "", image: null, imageCaption: "", bgImage: null, bgMode: "",
-      bgColorMode: "", bgFillType: "solid", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
+      bgColorMode: "", bgFillType: "solid", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgFit: "contain",
       capStyleMode: "",
       figureImage: null, figureSide: "right", figureLayer: "back", figX: 50, figY: 50, figScale: 100, figRotate: 0, figFlip: false, figOpacity: 100,
       imgX: 50, imgY: 50, imgZoom: 100,
@@ -132,10 +183,10 @@ function freshSlide(base) {
 const state = {
   bgImage: null,
   briefText: "",
-  settings: { igHandle: "pastipintar.utbk", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5",
-    bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155,
+  settings: Object.assign(defaultFx(), { igHandle: "pastipintar.utbk", website: "pastipintar.id", font: "Anton", customFontUrl: "", ratio: "4:5",
+    bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgFit: "contain",
     bgX: 50, bgY: 50, bgScale: 100,
-    capStyle: defaultCapStyle() },
+    capStyle: defaultCapStyle() }),
   slides: DEFAULT_SLIDES.map(freshSlide),
 };
 // Lets shared controls (transform sliders) bound to settings repaint every slide.
@@ -204,7 +255,7 @@ function autoMeta() {
     id: "auto_" + (current.savedId || current.draftId), kind: "auto",
     of: current.savedId, name: current.name,
     createdAt: current.createdAt, updatedAt: Date.now(), autosavedAt: Date.now(),
-    thumb: current.thumb, appVersion: 13,
+    thumb: current.thumb, appVersion: 14,
   };
 }
 let autosaveFailCount = 0; // consecutive failures — drives the "autosave gagal" warning below
@@ -267,7 +318,7 @@ async function manualSave(asNew) {
   await ensureThumb();
   await store.saveProject({
     id, kind: "saved", name, createdAt, updatedAt: Date.now(),
-    autosavedAt: current.lastAuto, thumb: current.thumb, appVersion: 13,
+    autosavedAt: current.lastAuto, thumb: current.thumb, appVersion: 14,
   }, snapshot());
   // the old draft's autosave row now belongs to the saved id
   if (!current.savedId || asNew) await store.deleteProject("auto_" + (current.savedId || current.draftId)).catch(() => {});
@@ -307,6 +358,13 @@ function applyProject(meta, content) {
     current.dirty = false;
     current.lastAuto = meta.autosavedAt || null;
     current.lastManual = meta.kind === "saved" ? meta.updatedAt : null;
+    // Projects saved before the background-fit option existed were always rendered
+    // with the photo cover-cropped to fill the slide. Pin them to "cover" so they
+    // still look exactly as saved — only new work gets the uncropped default.
+    if (!(meta.appVersion >= 14)) {
+      if (content.settings && !content.settings.bgFit) content.settings.bgFit = "cover";
+      (content.slides || []).forEach((s) => { if (s && !s.bgFit) s.bgFit = "cover"; });
+    }
     Object.assign(state.settings, content.settings || {});
     state.bgImage = content.bgImage || null;
     state.briefText = content.briefText || "";
@@ -325,7 +383,7 @@ function newProject() {
     current.name = "Tanpa Judul"; current.createdAt = Date.now();
     current.thumb = null; current.dirty = false; current.lastAuto = null; current.lastManual = null;
     state.bgImage = null; state.briefText = "";
-    Object.assign(state.settings, { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgX: 50, bgY: 50, bgScale: 100, capStyle: defaultCapStyle() });
+    Object.assign(state.settings, defaultFx(), { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgFit: "contain", bgX: 50, bgY: 50, bgScale: 100, capStyle: defaultCapStyle() });
     state.slides = DEFAULT_SLIDES.map(freshSlide);
     lastPngs = [];
     syncGlobalInputs();
@@ -493,9 +551,53 @@ function resolveBgFill(slide) {
   }
   return "";
 }
+/* ---- Background overlay & image effects (resolved for the renderer) ---- */
+// Per-stop alpha lets a gradient fade to fully transparent — the "dark at the bottom
+// only" look that a single opacity value can't express.
+function rgbaOf(hex, alphaPct) {
+  const [r, g, b] = hexToRgbArr(hex || "#000000");
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(100, alphaPct == null ? 100 : alphaPct)) / 100})`;
+}
+function overlayCss(o) {
+  const c1 = rgbaOf(o.ovC1 || "#000000", o.ovA1);
+  const c2 = rgbaOf(o.ovC2 || "#000000", o.ovA2);
+  switch (o.ovType) {
+    case "solid": return c1;
+    case "linear": return `linear-gradient(${o.ovAngle == null ? 180 : o.ovAngle}deg, ${c1}, ${c2})`;
+    case "radial": return `radial-gradient(circle at 50% 50%, ${c1}, ${c2})`;
+    // Transparent core → the picked colour at the rim, so the photo stays visible in
+    // the middle while the edges (and any text over them) get darker.
+    case "vignette": return `radial-gradient(ellipse at 50% 50%, ${rgbaOf(o.ovC1 || "#000000", 0)} 42%, ${c1} 100%)`;
+    default: return "";
+  }
+}
+function fxFilterCss(o) {
+  const parts = [];
+  if (o.bgBlur) parts.push(`blur(${o.bgBlur}px)`);
+  if (o.bgBrightness != null && o.bgBrightness !== 100) parts.push(`brightness(${o.bgBrightness}%)`);
+  if (o.bgContrast != null && o.bgContrast !== 100) parts.push(`contrast(${o.bgContrast}%)`);
+  if (o.bgSaturate != null && o.bgSaturate !== 100) parts.push(`saturate(${o.bgSaturate}%)`);
+  if (o.bgGrayscale) parts.push(`grayscale(${o.bgGrayscale}%)`);
+  return parts.join(" ");
+}
+const NO_FX = { overlay: "", blend: "", opacity: 1, filter: "", blur: 0 };
+function resolveFx(slide) {
+  const src = slide.fxMode === "custom" ? slide : slide.fxMode === "global" ? state.settings : null;
+  if (!src) return NO_FX;
+  return {
+    overlay: overlayCss(src),
+    blend: src.ovBlend || "normal",
+    opacity: (src.ovOpacity == null ? 100 : src.ovOpacity) / 100,
+    filter: fxFilterCss(src),
+    blur: src.bgBlur || 0,
+  };
+}
 function slideData(slide, idx, logo) {
+  const fx = resolveFx(slide);
   return {
     bgFill: resolveBgFill(slide),
+    bgOverlay: fx.overlay, bgOverlayBlend: fx.blend, bgOverlayOpacity: fx.opacity,
+    bgFilter: fx.filter, bgBlur: fx.blur,
     figureImage: slide.figureImage, figureSide: slide.figureSide, figureLayer: slide.figureLayer,
     figX: slide.figX, figY: slide.figY, figScale: slide.figScale, figRotate: slide.figRotate, figFlip: slide.figFlip, figOpacity: slide.figOpacity,
     type: slide.type, theme: slide.theme, align: slide.align, topic: slide.topic,
@@ -512,6 +614,7 @@ function slideData(slide, idx, logo) {
     bgX: slide.bgMode === "global" ? (state.settings.bgX ?? 50) : slide.bgX,
     bgY: slide.bgMode === "global" ? (state.settings.bgY ?? 50) : slide.bgY,
     bgZoom: slide.bgMode === "global" ? (state.settings.bgScale ?? 100) : (slide.bgScale ?? slide.bgZoom),
+    bgFit: slide.bgMode === "global" ? (state.settings.bgFit || "contain") : (slide.bgFit || "contain"),
     imgX: slide.imgX, imgY: slide.imgY, imgZoom: slide.imgScale ?? slide.imgZoom,
     textureX: slide.textureX, textureY: slide.textureY, textureScale: slide.textureScale, 
     patternX: slide.patternX, patternY: slide.patternY, patternScale: slide.patternScale, patternThickness: slide.patternThickness,
@@ -633,6 +736,70 @@ function buildBgFillEditor(obj, onChange, opts) {
   return box;
 }
 
+/* ================= Background overlay & image-effect editor =================
+ * One widget, reused for the GLOBAL overlay (Pengaturan Global) and for a slide's
+ * own CUSTOM overlay — same deal as buildBgFillEditor. `obj` is whichever object
+ * owns the overlay/effect fields. Repaints itself in place when a preset or the type
+ * changes (so the visible controls always match the chosen overlay type) without
+ * touching the surrounding card. */
+const OV_KEYS = ["ovType", "ovC1", "ovC2", "ovA1", "ovA2", "ovAngle", "ovBlend", "ovOpacity"];
+function buildBgFxEditor(obj, onChange) {
+  const box = document.createElement("div"); box.className = "bgfill-editor";
+  const paint = () => {
+    box.innerHTML = "";
+
+    const presetLbl = document.createElement("div"); presetLbl.className = "cp-label"; presetLbl.textContent = "Preset cepat";
+    box.appendChild(presetLbl);
+    box.appendChild(chipRow(OV_PRESETS, null, (id) => {
+      const p = OV_PRESETS.find((x) => x.id === id);
+      if (!p) return;
+      // Start from the neutral overlay defaults so leftovers from the previous preset
+      // (e.g. a gradient's second colour) can't leak into the new one. Image effects
+      // are deliberately left alone — they're a separate concern from the overlay.
+      const base = defaultFx();
+      OV_KEYS.forEach((k) => { obj[k] = base[k]; });
+      Object.assign(obj, p.patch);
+      paint(); onChange();
+    }));
+
+    const r1 = document.createElement("div"); r1.className = "opt-row";
+    r1.appendChild(labeled("Jenis overlay", dropdown(OV_TYPES, obj.ovType || "", (id) => { obj.ovType = id; paint(); onChange(); })));
+    r1.appendChild(labeled("Mode blend", dropdown(OV_BLENDS, obj.ovBlend || "normal", (id) => { obj.ovBlend = id; onChange(); })));
+    box.appendChild(r1);
+
+    if (obj.ovType) {
+      const isGrad = obj.ovType === "linear" || obj.ovType === "radial";
+      box.appendChild(buildColorControl(obj, "ovC1", isGrad ? "Warna 1" : "Warna overlay", onChange));
+      box.appendChild(buildObjSlider(obj, "ovA1", isGrad ? "Kepekatan warna 1 (%) — 0 = transparan" : "Kepekatan warna (%)", 0, 100, 100, onChange));
+      if (isGrad) {
+        box.appendChild(buildColorControl(obj, "ovC2", "Warna 2", onChange));
+        box.appendChild(buildObjSlider(obj, "ovA2", "Kepekatan warna 2 (%) — 0 = transparan", 0, 100, 0, onChange));
+      }
+      if (obj.ovType === "linear") box.appendChild(buildObjSlider(obj, "ovAngle", "Arah gradasi (°)", 0, 360, 180, onChange));
+      box.appendChild(buildObjSlider(obj, "ovOpacity", "Kekuatan overlay (%)", 0, 100, 45, onChange));
+    }
+
+    const fxLbl = document.createElement("div"); fxLbl.className = "cp-label"; fxLbl.style.marginTop = "10px";
+    fxLbl.textContent = "Efek gambar background (blur & warna)";
+    box.appendChild(fxLbl);
+    box.appendChild(buildObjSlider(obj, "bgBlur", "Blur (px)", 0, 40, 0, onChange));
+    box.appendChild(buildObjSlider(obj, "bgBrightness", "Kecerahan (%)", 20, 150, 100, onChange));
+    box.appendChild(buildObjSlider(obj, "bgContrast", "Kontras (%)", 50, 150, 100, onChange));
+    box.appendChild(buildObjSlider(obj, "bgSaturate", "Saturasi (%)", 0, 200, 100, onChange));
+    box.appendChild(buildObjSlider(obj, "bgGrayscale", "Hitam-putih (%)", 0, 100, 0, onChange));
+    const hint = document.createElement("span"); hint.className = "field-hint";
+    hint.textContent = "Blur & efek warna hanya kena ke gambar background; overlay tetap jalan walau slide cuma pakai warna tema.";
+    box.appendChild(hint);
+
+    const reset = document.createElement("button");
+    reset.type = "button"; reset.className = "link-btn"; reset.textContent = "↺ Reset overlay & efek";
+    reset.addEventListener("click", () => { Object.assign(obj, defaultFx(), { ovType: "" }); paint(); onChange(); });
+    box.appendChild(reset);
+  };
+  paint();
+  return box;
+}
+
 /* The global background editor in Pengaturan Global (rebuilt on restore). */
 function renderGlobalBgEditor() {
   const host = document.getElementById("globalBgFill");
@@ -661,10 +828,29 @@ function renderGlobalBgEditor() {
     releaseImg.addEventListener("click", () => { state.slides.forEach((s) => { if (s.bgMode === "global") s.bgMode = ""; }); renderSlides(); });
     imgActions.appendChild(applyImg); imgActions.appendChild(releaseImg);
   }
+  // Global overlay & image effects — inherited by every slide whose overlay mode is
+  // "Global"; the apply-all button switches every slide over in one click.
+  const fxHost = document.getElementById("globalBgFx");
+  if (fxHost) {
+    fxHost.innerHTML = "";
+    fxHost.appendChild(buildBgFxEditor(state.settings, () => { refreshAll(); markDirty(); }));
+    const applyFx = document.createElement("button");
+    applyFx.type = "button"; applyFx.className = "link-btn"; applyFx.textContent = "Terapkan overlay & efek ini ke semua slide";
+    applyFx.addEventListener("click", () => { state.slides.forEach((s) => { s.fxMode = "global"; }); renderSlides(); });
+    const clearFx = document.createElement("button");
+    clearFx.type = "button"; clearFx.className = "link-btn"; clearFx.textContent = "Matikan di semua slide";
+    clearFx.title = "Overlay slide yang custom tetap tersimpan, cuma dimatikan";
+    clearFx.addEventListener("click", () => { state.slides.forEach((s) => { s.fxMode = ""; }); renderSlides(); });
+    const row = document.createElement("div"); row.className = "chip-row"; row.style.marginTop = "6px";
+    row.appendChild(applyFx); row.appendChild(clearFx);
+    fxHost.appendChild(row);
+  }
   // Global image position/zoom — inherited live by every slide in global mode.
   const tHost = document.getElementById("bgGlobalTransform");
   if (tHost) {
     tHost.innerHTML = "";
+    tHost.appendChild(labeled("Ukuran gambar", dropdown(BG_FITS, state.settings.bgFit || "contain", (id) => { state.settings.bgFit = id; refreshAll(); markDirty(); }),
+      "Utuh = seluruh gambar kelihatan (sisanya jadi warna background). Isi penuh = dipotong biar menuhin slide."));
     tHost.appendChild(buildTransformControls(state.settings, "bg", "Posisi & zoom gambar global (berlaku untuk semua slide global)", { alignments: true }));
   }
 }
@@ -810,21 +996,96 @@ const pgTemplate = document.getElementById("pgTemplate");
 const pgPreviewBox = document.getElementById("pgPreviewBox");
 const pgPreview = document.getElementById("pgPreview");
 const pgCharCount = document.getElementById("pgCharCount");
+// Editor-naskah mode (second tab): paste a brainstorm / draft and wrap it in an
+// Indonesian prompt that already carries the brief-format rules.
+const pgEditorTemplate = document.getElementById("pgEditorTemplate");
+const pgEditorNote = document.getElementById("pgEditorNote");
+const pgMaterial = document.getElementById("pgMaterial");
+const pgMaterialCount = document.getElementById("pgMaterialCount");
+const pgEdSlides = document.getElementById("pgEdSlides");
+const pgEdTone = document.getElementById("pgEdTone");
 let pgCurrentTemplateText = "";
+let pgMode = "form";
+
+const PG_EDITOR_NOTES = {
+  "editor-format": "Naskah kamu dipecah & dipadatkan jadi slide, isinya tetap punya kamu — nggak ditambah-tambahin.",
+  "editor-kembangkan": "Poin-poin mentah dikembangkan jadi naskah carousel utuh (hook → isi → CTA).",
+  "editor-rapikan": "Naskah yang formatnya udah bener tapi kepanjangan/berantakan — dirapikan tanpa ganti isi.",
+};
+// Skeleton pasted into the editor by "Sisipkan kerangka format" — the shape ChatGPT
+// is asked to return, so it doubles as a manual writing template.
+const PG_FORMAT_SKELETON = [
+  "=== Slide ===",
+  "layout: cover",
+  "theme: dark",
+  "topik: Hook",
+  "eyebrow: STOP DULU",
+  "judul: Judul pembuka yang bikin **berhenti scroll**",
+  "sub: Satu kalimat pendukung yang jelas.",
+  "",
+  "=== Slide ===",
+  "layout: list",
+  "theme: dark",
+  "topik: Isi",
+  "judul: 3 hal yang wajib kamu tahu",
+  "- 🎯 Poin pertama :: penjelasan singkatnya",
+  "- 💡 Poin kedua :: penjelasan singkatnya",
+  "- 🔥 Poin ketiga :: penjelasan singkatnya",
+  "",
+  "=== Slide ===",
+  "layout: compare",
+  "theme: dark",
+  "judul: Salah vs Benar",
+  "kiri: Yang sering dilakukan",
+  "- ❌ Kebiasaan yang keliru",
+  "kanan: Yang seharusnya",
+  "- ✅ Cara yang benar",
+  "",
+  "=== Slide ===",
+  "layout: cta",
+  "theme: dark",
+  "topik: Closing",
+  "judul: Mulai dari sekarang, **#PastiBisa**",
+  "sub: Simpan carousel ini biar nggak lupa.",
+  "tombol: Save & share ke temanmu 👇",
+  "",
+].join("\n");
 
 function initPromptGenerator() {
   pgTemplate.innerHTML = "";
-  listPromptTemplates().forEach((t) => {
+  listPromptTemplates("form").forEach((t) => {
     const opt = document.createElement("option");
     opt.value = t.id; opt.textContent = t.label;
     pgTemplate.appendChild(opt);
   });
+  pgEditorTemplate.innerHTML = "";
+  listPromptTemplates("editor").forEach((t) => {
+    const opt = document.createElement("option");
+    opt.value = t.id; opt.textContent = t.label;
+    pgEditorTemplate.appendChild(opt);
+  });
+  syncPgEditorNote();
+  syncPgMaterialCount();
+}
+function syncPgEditorNote() { pgEditorNote.textContent = PG_EDITOR_NOTES[pgEditorTemplate.value] || ""; }
+function syncPgMaterialCount() {
+  pgMaterialCount.textContent = pgMaterial.value.length.toLocaleString("id-ID") + " karakter";
+}
+/* Switching tabs never clears anything — both panes keep whatever was typed, and the
+ * generated-prompt box is hidden so a stale prompt from the other mode can't be
+ * mistaken for this one's output. */
+function setPromptMode(mode) {
+  pgMode = mode === "editor" ? "editor" : "form";
+  document.querySelectorAll(".pg-tab").forEach((t) => t.classList.toggle("active", t.dataset.pgMode === pgMode));
+  document.getElementById("pgFormPane").style.display = pgMode === "form" ? "grid" : "none";
+  document.getElementById("pgEditorPane").style.display = pgMode === "editor" ? "grid" : "none";
+  pgPreviewBox.style.display = "none";
 }
 
 function openPromptGenerator() {
   pgModal.style.display = "flex";
   pgModal.setAttribute("aria-hidden", "false");
-  pgTopic.focus();
+  (pgMode === "editor" ? pgMaterial : pgTopic).focus();
 }
 
 function closePromptGenerator() {
@@ -833,26 +1094,35 @@ function closePromptGenerator() {
 }
 
 function resetPromptGenerator() {
-  pgTopic.value = "";
-  pgAudience.value = "";
-  pgSlides.value = "";
-  pgGoal.value = "";
-  pgTone.value = "";
-  pgExtra.value = "";
-  pgTemplate.selectedIndex = 0;
+  // Only the pane you're looking at gets cleared — resetting the form shouldn't wipe a
+  // long naskah you pasted in the other tab (and vice-versa).
+  if (pgMode === "editor") {
+    pgMaterial.value = "";
+    pgEdSlides.value = "";
+    pgEdTone.value = "";
+    pgEditorTemplate.selectedIndex = 0;
+    syncPgEditorNote();
+    syncPgMaterialCount();
+  } else {
+    pgTopic.value = "";
+    pgAudience.value = "";
+    pgSlides.value = "";
+    pgGoal.value = "";
+    pgTone.value = "";
+    pgExtra.value = "";
+    pgTemplate.selectedIndex = 0;
+  }
   pgPreview.value = "";
   pgPreviewBox.style.display = "none";
   pgCharCount.textContent = "0 karakter";
   pgCurrentTemplateText = "";
 }
 
-async function runPromptGenerator() {
+function readFormInputs() {
   const topic = pgTopic.value.trim();
-  if (!topic) { pgTopic.focus(); showToast("Topik wajib diisi."); return; }
-  const tplId = pgTemplate.value;
-  pgCurrentTemplateText = await loadTemplate(tplId);
-  if (!pgCurrentTemplateText) { showToast("Gagal memuat template prompt."); return; }
-  const inputs = {
+  if (!topic) { pgTopic.focus(); showToast("Topik wajib diisi."); return null; }
+  return {
+    _tplId: pgTemplate.value,
     topic,
     targetAudience: pgAudience.value.trim(),
     slides: pgSlides.value.trim(),
@@ -860,6 +1130,23 @@ async function runPromptGenerator() {
     tone: pgTone.value.trim(),
     extraInstructions: pgExtra.value.trim(),
   };
+}
+function readEditorInputs() {
+  const material = pgMaterial.value.trim();
+  if (!material) { pgMaterial.focus(); showToast("Naskahnya masih kosong — tempel dulu di editor."); return null; }
+  return {
+    _tplId: pgEditorTemplate.value,
+    material,
+    slides: pgEdSlides.value.trim(),
+    tone: pgEdTone.value.trim(),
+  };
+}
+
+async function runPromptGenerator() {
+  const inputs = pgMode === "editor" ? readEditorInputs() : readFormInputs();
+  if (!inputs) return; // validation already told the user what's missing
+  pgCurrentTemplateText = await loadTemplate(inputs._tplId);
+  if (!pgCurrentTemplateText) { showToast("Gagal memuat template prompt."); return; }
   const generated = generatePrompt(pgCurrentTemplateText, inputs);
   pgPreview.value = generated;
   pgPreviewBox.style.display = "block";
@@ -890,6 +1177,40 @@ async function openChatGPT() {
   window.open("https://chat.openai.com/", "_blank", "noopener,noreferrer");
 }
 
+document.querySelectorAll(".pg-tab").forEach((t) => t.addEventListener("click", () => setPromptMode(t.dataset.pgMode)));
+pgEditorTemplate.addEventListener("change", syncPgEditorNote);
+pgMaterial.addEventListener("input", syncPgMaterialCount);
+document.getElementById("pgInsertFormatBtn").addEventListener("click", () => {
+  const cur = pgMaterial.value;
+  pgMaterial.value = cur.trim() ? cur.replace(/\s*$/, "\n\n") + PG_FORMAT_SKELETON : PG_FORMAT_SKELETON;
+  syncPgMaterialCount();
+  pgMaterial.focus();
+  pgMaterial.scrollTop = pgMaterial.scrollHeight;
+});
+// Round-trip with the main content editor: pull what's already there to clean it up,
+// or push the (already formatted) naskah back so it can be turned into slides.
+document.getElementById("pgFromBriefBtn").addEventListener("click", () => {
+  const text = briefEditor.value;
+  if (!text.trim()) { showToast("Editor Konten masih kosong."); return; }
+  if (pgMaterial.value.trim() && !confirm("Ganti isi editor naskah dengan isi Editor Konten?")) return;
+  pgMaterial.value = text;
+  syncPgMaterialCount();
+  showToast("Naskah diambil dari Editor Konten.");
+});
+document.getElementById("pgToBriefBtn").addEventListener("click", () => {
+  const text = pgMaterial.value;
+  if (!text.trim()) { showToast("Naskahnya masih kosong."); return; }
+  if (briefEditor.value.trim() && !confirm("Isi Editor Konten akan diganti dengan naskah ini. Lanjut?")) return;
+  briefEditor.value = text;
+  state.briefText = text;
+  briefEditor.dispatchEvent(new Event("__sync"));
+  markDirty();
+  closePromptGenerator();
+  const textTab = document.querySelector('.input-tab[data-mode="text"]');
+  if (textTab) textTab.click();
+  briefEditor.scrollIntoView({ behavior: "smooth", block: "center" });
+  showToast("Naskah masuk ke Editor Konten — tinggal klik “Buat Slide dari Teks”.");
+});
 document.getElementById("openPromptGeneratorBtn").addEventListener("click", openPromptGenerator);
 document.getElementById("pgCloseBtn").addEventListener("click", closePromptGenerator);
 document.getElementById("pgBackdrop")?.addEventListener("click", closePromptGenerator);
@@ -1007,9 +1328,11 @@ function dropdown(options, current, onPick) {
   sel.addEventListener("change", () => onPick(sel.value));
   return sel;
 }
-function colorField(slide, key, labelText) {
+// `defColor` = the swatch shown while the field is still on "Default" — it should
+// look like what the slide actually renders (e.g. dark ink for stabilo TEXT, not gold).
+function colorField(slide, key, labelText, defColor) {
   const wrap = document.createElement("div"); wrap.className = "color-field";
-  const input = document.createElement("input"); input.type = "color"; input.value = slide[key] || "#F7B400";
+  const input = document.createElement("input"); input.type = "color"; input.value = slide[key] || defColor || "#F7B400";
   const def = document.createElement("button"); def.type = "button"; def.className = "chip sm" + (slide[key] ? "" : " active"); def.textContent = "Default";
   input.addEventListener("input", () => { slide[key] = input.value; def.classList.remove("active"); slide._send && slide._send(); });
   def.addEventListener("click", () => { slide[key] = ""; def.classList.add("active"); slide._send && slide._send(); });
@@ -1421,7 +1744,7 @@ function buildCard(slide, idx) {
   advInner.appendChild(colorRow);
   const colorRow2 = document.createElement("div"); colorRow2.className = "opt-row";
   colorRow2.appendChild(colorField(slide, "markColor", "Background Stabilo"));
-  colorRow2.appendChild(colorField(slide, "highlightTextColor", "Teks Stabilo"));
+  colorRow2.appendChild(colorField(slide, "highlightTextColor", "Teks Stabilo", "#101138"));
   advInner.appendChild(colorRow2);
   const resetColorsBtn = document.createElement("button");
   resetColorsBtn.type = "button"; resetColorsBtn.className = "link-btn";
@@ -1523,6 +1846,8 @@ function buildCard(slide, idx) {
     note.textContent = "Slide ini memakai gambar background-nya sendiri (menimpa global).";
     bgWrap.appendChild(note);
     bgWrap.appendChild(buildImageDropzone(slide, "bgImage", () => slide._send && slide._send(), "background khusus slide ini"));
+    bgWrap.appendChild(labeled("Ukuran gambar", dropdown(BG_FITS, slide.bgFit || "contain", (id) => { slide.bgFit = id; slide._send && slide._send(); }),
+      "Utuh = seluruh gambar kelihatan (sisanya jadi warna background). Isi penuh = dipotong biar menuhin slide."));
     bgWrap.appendChild(buildTransformControls(slide, "bg", "Posisi Background", { alignments: true }));
   } else if (slide.bgMode === "global") {
     const note = document.createElement("div"); note.className = "field-hint";
@@ -1532,6 +1857,24 @@ function buildCard(slide, idx) {
     bgWrap.appendChild(note);
   }
   advInner.appendChild(labeled("Background Gambar", bgWrap, "Global = ikut Pengaturan Global. Custom = gambar khusus slide ini."));
+
+  // Overlay + image effects for this slide's background: off / follow global /
+  // custom. Same three-mode pattern as background colour & image above.
+  const fxWrap = document.createElement("div");
+  fxWrap.appendChild(dropdown(FX_MODES, slide.fxMode, (id) => { slide.fxMode = id; rebuildCard(slide); }));
+  if (slide.fxMode === "custom") {
+    const note = document.createElement("div"); note.className = "field-hint";
+    note.textContent = "Slide ini punya overlay & efek sendiri (menimpa global).";
+    fxWrap.appendChild(note);
+    fxWrap.appendChild(buildBgFxEditor(slide, () => slide._send && slide._send()));
+  } else if (slide.fxMode === "global") {
+    const note = document.createElement("div"); note.className = "field-hint";
+    note.textContent = state.settings.ovType || fxFilterCss(state.settings)
+      ? "Slide ini mengikuti overlay & efek global (atur di Pengaturan Global)."
+      : "Mode global aktif, tapi overlay & efek global belum diatur di Pengaturan Global.";
+    fxWrap.appendChild(note);
+  }
+  advInner.appendChild(labeled("Overlay & Efek Background", fxWrap, "Gelapkan background yang kesilauan (multiply/darken), kasih gradasi, atau blur biar teks kebaca."));
 
   col.appendChild(adv);
 
@@ -2195,7 +2538,9 @@ function collectPptx(stage, markHex, data, igIconPng) {
       lineh: clamp(safeNum(linePx / fontPx, 1.15), 0.7, 2.5),
       linePx: safeNum(linePx, fontPx * 1.15),
       charSpacing: clamp(safeNum(letterSpacingPx, 0), -2, 8),
-      markText: contrastHex(elemMarkHex), markFill: elemMarkHex,
+      // Honour a user-picked stabilo TEXT colour (it's what the preview/PNG shows);
+      // otherwise fall back to the auto-contrast colour against the highlight fill.
+      markText: (data && data.highlightTextColor || "").replace("#", "") || contrastHex(elemMarkHex), markFill: elemMarkHex,
       // Last-resort safety net: if the substituted font is even wider/taller than the
       // measured margin above accounts for, let PowerPoint shrink the text to fit
       // its box instead of overflowing/overlapping the next element.
@@ -2420,7 +2765,7 @@ downloadPptxBtn.addEventListener("click", async () => {
     // Version + time in the filename so a fresh export can't be confused with an
     // older download of the same name sitting in the Downloads folder.
     const t = new Date();
-    const fname = `carousel-pastipintar-v15-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
+    const fname = `carousel-pastipintar.utbk-v15-${String(t.getHours()).padStart(2, "0")}${String(t.getMinutes()).padStart(2, "0")}.pptx`;
     try {
       await downloadPptx(specs, fname);
     } catch (e) {

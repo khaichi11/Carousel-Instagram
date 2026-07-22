@@ -217,7 +217,7 @@
     // that's what "texturizes" the image instead of only tinting the empty background.
     stage.innerHTML =
       '<div class="bg-photo"></div><div class="bg-gradient"></div><div class="bg-pattern"></div>' +
-      '<div class="scrim"></div>' +
+      '<div class="scrim"></div><div class="bg-overlay"></div>' +
       '<div class="stage-top"><div class="logo-chip"><img alt="logo"></div><div class="counter" style="display:none"></div></div>' +
       '<div class="stage-body"></div>' +
       '<div class="stage-foot"><div class="handles"></div></div>' +
@@ -236,8 +236,33 @@
       // image be slid up/down/left/right freely — the area it vacates shows the slide's
       // themed background (.stage base). X and Y behave identically. Range is ±50% so the
       // extreme moves the image half off, matching the in-slide image control.
-      photoImg.style.transform = "translate(" + ((d.bgX ?? 50) - 50) + "%, " + ((d.bgY ?? 50) - 50) + "%) scale(" + ((d.bgZoom || 100) / 100) + ")";
+      //
+      // Image effects (blur / brightness / contrast / saturation / grayscale) arrive as
+      // a ready-made CSS filter string. A blur fades the image's own edges, which would
+      // show the slide background through as a soft halo — so scale the photo up a
+      // little (proportional to the blur radius) to push that edge out of frame.
+      // "contain" (the default) keeps the WHOLE picture on the slide — nothing is
+      // cropped away, and the area it doesn't cover shows the slide's own background,
+      // so the X/Y sliders genuinely move the picture. "cover" is the fill-the-frame
+      // crop, opt-in per slide (and kept for pre-existing projects).
+      photoImg.style.objectFit = d.bgFit === "cover" ? "cover" : "contain";
+      var bgScale = (d.bgZoom || 100) / 100;
+      if (d.bgFilter) photoImg.style.filter = d.bgFilter;
+      if (d.bgBlur) bgScale *= 1 + Math.min(0.5, d.bgBlur * 0.006);
+      photoImg.style.transform = "translate(" + ((d.bgX ?? 50) - 50) + "%, " + ((d.bgY ?? 50) - 50) + "%) scale(" + bgScale + ")";
       stage.querySelector(".bg-photo").appendChild(photoImg);
+    }
+
+    // Background overlay: a colour/gradient sheet over the whole background (photo,
+    // theme gradient and pattern) but behind all content, with its own blend mode
+    // (multiply/darken/screen/…) and opacity. This is what makes a bright photo
+    // readable without touching the photo itself.
+    if (d.bgOverlay) {
+      var ov = stage.querySelector(".bg-overlay");
+      ov.style.display = "block";
+      ov.style.background = d.bgOverlay;
+      ov.style.mixBlendMode = d.bgOverlayBlend || "normal";
+      ov.style.opacity = d.bgOverlayOpacity == null ? 1 : d.bgOverlayOpacity;
     }
 
     // Custom background fill (solid / linear / radial), global or per-slide — an

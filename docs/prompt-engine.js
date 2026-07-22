@@ -3,13 +3,22 @@
  * into placeholder variables. Designed to support multiple templates without
  * changing the UI. */
 
+/* Two families of templates:
+ *  - mode "form"   → built from the quick form (topic/audience/goal/…), the original flow.
+ *  - mode "editor" → built around a naskah/brainstorm the user pastes into the text
+ *                    editor ({{MATERIAL}}); written in Indonesian and carrying the
+ *                    brief-format rules, so ChatGPT hands back something the importer
+ *                    can parse straight away. */
 const PROMPT_TEMPLATES = [
-  { id: "carousel", label: "Educational Carousel", file: "prompts/carousel-master-prompt.txt" },
-  { id: "utbk", label: "UTBK Carousel", file: "prompts/utbk-prompt.txt" },
-  { id: "storytelling", label: "Storytelling Carousel", file: "prompts/storytelling-prompt.txt" },
-  { id: "motivation", label: "Motivation Carousel", file: "prompts/motivation-prompt.txt" },
-  { id: "business", label: "Business Carousel", file: "prompts/business-prompt.txt" },
-  { id: "programming", label: "Programming Carousel", file: "prompts/programming-prompt.txt" },
+  { id: "carousel", label: "Educational Carousel", file: "prompts/carousel-master-prompt.txt", mode: "form" },
+  { id: "utbk", label: "UTBK Carousel", file: "prompts/utbk-prompt.txt", mode: "form" },
+  { id: "storytelling", label: "Storytelling Carousel", file: "prompts/storytelling-prompt.txt", mode: "form" },
+  { id: "motivation", label: "Motivation Carousel", file: "prompts/motivation-prompt.txt", mode: "form" },
+  { id: "business", label: "Business Carousel", file: "prompts/business-prompt.txt", mode: "form" },
+  { id: "programming", label: "Programming Carousel", file: "prompts/programming-prompt.txt", mode: "form" },
+  { id: "editor-format", label: "Ubah naskah → format slide (ID)", file: "prompts/editor-format-id.txt", mode: "editor" },
+  { id: "editor-kembangkan", label: "Kembangkan brainstorm → carousel (ID)", file: "prompts/editor-kembangkan-id.txt", mode: "editor" },
+  { id: "editor-rapikan", label: "Rapikan & padatkan naskah (ID)", file: "prompts/editor-rapikan-id.txt", mode: "editor" },
 ];
 
 const DEFAULTS = {
@@ -19,6 +28,7 @@ const DEFAULTS = {
   tone: "motivasi edukatif",
   slides: "5-7",
   extraInstructions: "",
+  material: "",
 };
 
 const PLACEHOLDERS = {
@@ -28,12 +38,16 @@ const PLACEHOLDERS = {
   TONE: "tone",
   SLIDES: "slides",
   EXTRA_INSTRUCTIONS: "extraInstructions",
+  MATERIAL: "material",
 };
 
 const cache = new Map();
 
-export function listPromptTemplates() {
-  return PROMPT_TEMPLATES.map((t) => ({ id: t.id, label: t.label }));
+// `mode` defaults to "form" so the original call site keeps getting exactly the
+// templates it always got, unaffected by the editor ones added above.
+export function listPromptTemplates(mode) {
+  const want = mode || "form";
+  return PROMPT_TEMPLATES.filter((t) => (t.mode || "form") === want).map((t) => ({ id: t.id, label: t.label }));
 }
 
 export async function loadTemplate(id) {
@@ -71,6 +85,7 @@ function defaultFor(key) {
     case "tone": return "motivasi edukatif";
     case "slides": return "5-7";
     case "extraInstructions": return "Tidak ada instruksi tambahan.";
+    case "material": return "[tempel naskah / hasil brainstorming di sini]";
     default: return "";
   }
 }

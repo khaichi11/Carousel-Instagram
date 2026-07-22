@@ -301,11 +301,23 @@ input[type="range"]:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(247,180
 .pg-char-count { font-size: 12px; color: var(--text-soft); }
 .pg-preview-text { width: 100%; min-height: 160px; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px; font: 13px/1.55 ui-monospace, monospace; resize: vertical; background: #fff; }
 .pg-preview-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+/* Mode switch inside the prompt generator: quick form vs. free-text naskah editor. */
+.pg-tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1.5px solid var(--border); }
+.pg-tab { border: none; background: none; padding: 9px 14px; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--text-soft); cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; border-radius: 8px 8px 0 0; }
+.pg-tab:hover { background: rgba(0,0,0,0.04); }
+.pg-tab.active { color: var(--text); border-bottom-color: var(--gold); }
+.pg-material { min-height: 180px; font: 13px/1.6 ui-monospace, monospace; resize: vertical; }
+.pg-editor-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 2px; }
+.pg-editor-tools .pg-char-count { margin-right: auto; }
+.pg-note { font-size: 12px; color: var(--text-soft); line-height: 1.45; }
+.pg-rules { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 5px; font-size: 12.5px; line-height: 1.5; color: var(--text-soft); }
+.pg-rules code { background: rgba(0,0,0,0.05); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
 @media (max-width: 640px) {
   .pg-row { grid-template-columns: 1fr; }
   .pg-dialog { padding: 20px 18px; }
   .pg-preview-actions { flex-direction: column; }
   .pg-preview-actions .btn { width: 100%; justify-content: center; }
+  .pg-tabs { flex-wrap: wrap; }
 }
 .tpl-card { border: 1px solid rgba(0,0,0,0.09); border-radius: 14px; padding: 14px; background: #fff; display: flex; flex-direction: column; gap: 6px; }
 .tpl-card strong { font-size: 14.5px; }
