@@ -329,7 +329,7 @@
         <label class="pg-imgtoggle"><input type="checkbox" id="pgImgInclude" checked /> 🎨 Sertakan prompt gambar (English) di hasil</label>
       </summary>
       <div class="pg-imgprompt-inner">
-        <p class="pg-note">ChatGPT akan menambah satu <b>prompt gambar bahasa Inggris</b> di tiap slide (sebagai baris <code>//</code> biar nggak ganggu import), memakai base style tetap di bawah + detail sesuai topik slide. Base style-nya bisa kamu ubah.</p>
+        <p class="pg-note">ChatGPT akan menambah <b>satu prompt gambar bahasa Inggris</b> di paling bawah naskah (bukan per slide), sebagai baris <code>//</code> biar diabaikan pas build slide tapi tetap kebaca kalau di-copy. Memakai base style tetap di bawah + adegan sesuai tema carousel. Base style-nya bisa kamu ubah.</p>
         <label class="pg-imglabel" for="pgImgStyle">Base style gambar (dipakai di semua slide, bahasa Inggris)</label>
         <textarea id="pgImgStyle" class="pg-bulk" rows="4" spellcheck="false"></textarea>
         <button type="button" class="link-btn" id="pgImgResetBtn">↺ Kembalikan base style default</button>
@@ -360,6 +360,6 @@
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=29"></script>
+<script type="module" src="app.js?v=30"></script>
 </body>
 </html>

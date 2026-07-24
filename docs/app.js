@@ -1246,31 +1246,34 @@ function readEditorInputs() {
 }
 
 /* Image-prompt instructions appended to the generated prompt when the checkbox is on.
- * Tells ChatGPT to emit ONE English image prompt per slide as a "//" comment line
- * (ignored by the brief importer, so it never breaks the layout) built from the fixed
- * base style + a topic-specific action/scene — e.g. a "pusing/stress" slide gets a
- * character clutching their head looking overwhelmed. */
+ * Tells ChatGPT to emit exactly ONE English image prompt, at the very bottom of the
+ * whole script, as a single "//" comment line — the "//" makes the brief importer
+ * ignore it (so it never becomes a phantom slide), while it stays readable when the
+ * output is copied by hand. Built from the fixed base style + a scene representing
+ * the carousel's overall topic (e.g. a "pusing/stress" carousel → a character
+ * clutching their head looking overwhelmed). */
 function buildImagePromptBlock() {
   const base = (pgImgStyle.value.trim() || PG_IMG_STYLE_DEFAULT);
   return [
     "",
     "=== INSTRUKSI PROMPT GAMBAR (WAJIB) ===",
-    "Selain naskah slide, untuk SETIAP slide tambahkan satu baris prompt gambar",
-    "berbahasa INGGRIS tepat di bawah field slide itu, diawali persis dengan \"// gambar: \"",
-    "(pakai \"//\" supaya diabaikan importer, tapi tetap bisa saya copy).",
+    "Setelah SELURUH naskah slide selesai, di PALING BAWAH tambahkan HANYA SATU baris",
+    "prompt gambar berbahasa INGGRIS, diawali persis dengan \"// gambar: \".",
+    "Cuma SATU baris untuk seluruh carousel — JANGAN bikin prompt gambar di tiap slide,",
+    "dan JANGAN taruh di dalam slide mana pun.",
+    "Wajib diawali \"//\" supaya diabaikan importer (nggak jadi slide), tapi tetap bisa saya copy.",
     "",
-    "Setiap prompt gambar HARUS diawali base style tetap ini (jangan diubah, biar semua",
-    "gambar konsisten satu karakter/gaya):",
+    "Prompt gambar itu HARUS diawali base style tetap ini (jangan diubah):",
     base,
     "",
-    "Lalu tambahkan koma dan detail spesifik sesuai isi slide: karakternya lagi ngapain,",
-    "ekspresi, dan suasananya yang nyambung sama pesan slide (mis. topik \"pusing\" →",
+    "Lalu tambahkan koma dan satu adegan yang mewakili tema keseluruhan carousel:",
+    "karakternya lagi ngapain, ekspresi, dan suasananya (mis. tema \"pusing\" →",
     "\"a character clutching their head, overwhelmed, papers flying around\"). Aturan:",
-    "- Tulis prompt gambarnya dalam bahasa Inggris walau teks slide Bahasa Indonesia.",
-    "- Base style-nya identik di semua slide; yang berubah cuma bagian aksi/suasananya.",
+    "- Prompt gambarnya dalam bahasa Inggris walau teks slide Bahasa Indonesia.",
+    "- Hanya satu baris, taruh paling bawah, setelah slide terakhir.",
     "- Tanpa teks, tanpa logo, tanpa merek/karakter yang sudah ada.",
     "",
-    "Contoh satu baris: // gambar: " + base + ", a character clutching their head looking overwhelmed, soft warm indoor lighting",
+    "Contoh (SATU baris saja, di paling bawah): // gambar: " + base + ", a character clutching their head looking overwhelmed, soft warm indoor lighting",
   ].join("\n");
 }
 
