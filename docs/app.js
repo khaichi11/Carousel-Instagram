@@ -1002,6 +1002,9 @@ const pgGoal = document.getElementById("pgGoal");
 const pgTone = document.getElementById("pgTone");
 const pgExtra = document.getElementById("pgExtra");
 const pgTemplate = document.getElementById("pgTemplate");
+// Quick-fill: paste a "==== topik: …" block to populate the Form Cepat fields.
+const pgBulk = document.getElementById("pgBulk");
+const pgBulkStatus = document.getElementById("pgBulkStatus");
 const pgPreviewBox = document.getElementById("pgPreviewBox");
 const pgPreview = document.getElementById("pgPreview");
 const pgCharCount = document.getElementById("pgCharCount");
@@ -1091,6 +1094,88 @@ function setPromptMode(mode) {
   pgPreviewBox.style.display = "none";
 }
 
+/* ---- Form Cepat quick-fill: paste a "==== topik: …" block → fill the fields ----
+ * Each entry maps the field's input to the keys accepted for it (Indonesian first,
+ * a couple of English aliases). The parser is deliberately forgiving so a block
+ * copied straight out of ChatGPT works without hand-cleaning. */
+const PG_BULK_MAP = [
+  { el: () => pgTopic, name: "topik", keys: ["topik", "topic", "tema", "judul"] },
+  { el: () => pgAudience, name: "audience", keys: ["audience", "target audience", "target", "audiens", "sasaran"] },
+  { el: () => pgSlides, name: "slide", keys: ["slide", "slides", "jumlah slide", "jumlah"] },
+  { el: () => pgGoal, name: "tujuan", keys: ["tujuan", "goal", "objektif"] },
+  { el: () => pgTone, name: "tone", keys: ["tone", "nada", "gaya"] },
+  { el: () => pgExtra, name: "instruksi", keys: ["instruksi", "instruksi tambahan", "tambahan", "catatan", "extra", "notes"] },
+];
+// key (lowercased) -> map entry, built once from the alias lists above.
+const PG_BULK_KEYS = (() => { const m = {}; PG_BULK_MAP.forEach((f) => f.keys.forEach((k) => { m[k] = f; })); return m; })();
+const PG_BULK_SKELETON = [
+  "==== topik: Cara menghadapi UTBK tanpa burnout",
+  "==== audience: Pelajar SMA, pejuang UTBK",
+  "==== slide: 5-7",
+  "==== tujuan: Edukasi & motivasi",
+  "==== tone: Motivasi edukatif, santai",
+  "==== instruksi: Kasih contoh nyata, hindari bahasa kaku",
+].join("\n");
+// Blank template + instruction for ChatGPT to fill — copied to the clipboard so the
+// user can paste it into ChatGPT, get it filled, then paste the result back.
+const PG_BULK_COPY_TEMPLATE = [
+  "Tolong bantu isi format brief carousel di bawah ini berdasarkan ide/topik saya.",
+  "Aturan: jawab HANYA blok formatnya, jangan tambah penjelasan lain. Pertahankan",
+  "nama field dan tanda \"==== \" persis seperti ini, isi setelah tanda titik dua.",
+  "",
+  "==== topik: ",
+  "==== audience: ",
+  "==== slide: ",
+  "==== tujuan: ",
+  "==== tone: ",
+  "==== instruksi: ",
+  "",
+  "Ide/topik saya: [tulis topik kamu di sini]",
+].join("\n");
+
+/* Parse the bulk block into { field.name -> value }. A line starts a new field when,
+ * after stripping any leading run of = # * - and spaces, its text before the first
+ * ":" is a known key; otherwise the line is appended to the current field (so a
+ * multi-line "instruksi" value survives). Returns { values, count }. */
+function parsePgBulk(text) {
+  const values = {};
+  let current = null;
+  (text || "").split(/\r?\n/).forEach((raw) => {
+    const line = raw.replace(/^[\s=#*\-–—]+/, "");
+    const ci = line.indexOf(":");
+    if (ci > 0) {
+      const key = line.slice(0, ci).trim().toLowerCase();
+      const entry = PG_BULK_KEYS[key];
+      if (entry) {
+        current = entry.name;
+        values[current] = (line.slice(ci + 1).trim());
+        return;
+      }
+    }
+    // continuation line for the field in progress (keeps blank lines out of the front)
+    if (current && raw.trim()) values[current] += (values[current] ? "\n" : "") + raw.trim();
+  });
+  return { values, count: Object.keys(values).length };
+}
+function fillFormFromBulk() {
+  const { values, count } = parsePgBulk(pgBulk.value);
+  if (!count) {
+    pgBulkStatus.textContent = "Nggak ada baris berformat yang kebaca. Pakai pola “topik: …”, satu field per baris.";
+    return;
+  }
+  PG_BULK_MAP.forEach((f) => { if (values[f.name] != null) f.el().value = values[f.name]; });
+  const filled = PG_BULK_MAP.filter((f) => values[f.name] != null).map((f) => f.name);
+  pgBulkStatus.textContent = "✓ Terisi: " + filled.join(", ") + ". Cek lagi di bawah, lalu klik Generate Prompt.";
+  pgTopic.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+// Serialize whatever is currently in the form back into the bulk format, so the user
+// can tweak it as text (or hand it to ChatGPT as the template to fill).
+function bulkFromForm() {
+  const lines = PG_BULK_MAP.map((f) => "==== " + f.name + ": " + (f.el().value.trim() || "")).join("\n");
+  pgBulk.value = lines;
+  pgBulkStatus.textContent = "Diambil dari form. Edit teksnya, lalu klik “Isi form dari teks”.";
+}
+
 function openPromptGenerator() {
   pgModal.style.display = "flex";
   pgModal.setAttribute("aria-hidden", "false");
@@ -1120,6 +1205,8 @@ function resetPromptGenerator() {
     pgTone.value = "";
     pgExtra.value = "";
     pgTemplate.selectedIndex = 0;
+    pgBulk.value = "";
+    pgBulkStatus.textContent = "";
   }
   pgPreview.value = "";
   pgPreviewBox.style.display = "none";
@@ -1187,6 +1274,18 @@ async function openChatGPT() {
 }
 
 document.querySelectorAll(".pg-tab").forEach((t) => t.addEventListener("click", () => setPromptMode(t.dataset.pgMode)));
+// Form-Cepat quick-fill controls.
+document.getElementById("pgBulkFillBtn").addEventListener("click", fillFormFromBulk);
+document.getElementById("pgBulkCopyBtn").addEventListener("click", async () => {
+  try { await copyToClipboard(PG_BULK_COPY_TEMPLATE); showToast("Format tersalin — paste ke ChatGPT, minta diisiin, lalu tempel balik ke sini."); }
+  catch (e) { pgBulk.value = PG_BULK_COPY_TEMPLATE; showToast("Format ditaruh di kotak — copy manual dari situ."); }
+});
+document.getElementById("pgBulkSkeletonBtn").addEventListener("click", () => {
+  pgBulk.value = PG_BULK_SKELETON;
+  pgBulkStatus.textContent = "Contoh format dimuat. Ganti isinya, lalu klik “Isi form dari teks”.";
+  pgBulk.focus();
+});
+document.getElementById("pgBulkFromFormBtn").addEventListener("click", bulkFromForm);
 pgEditorTemplate.addEventListener("change", syncPgEditorNote);
 pgMaterial.addEventListener("input", syncPgMaterialCount);
 document.getElementById("pgInsertFormatBtn").addEventListener("click", () => {

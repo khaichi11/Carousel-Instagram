@@ -7,7 +7,7 @@
 <link rel="icon" href="logo/logo.png" />
 <link rel="stylesheet" href="fonts.css" />
 <link rel="stylesheet" href="stage.css?v=26" />
-<link rel="stylesheet" href="style.css?v=26" />
+<link rel="stylesheet" href="style.css?v=27" />
 </head>
 <body class="stage-scope">
 
@@ -225,6 +225,21 @@
     </div>
 
     <div class="pg-form" id="pgFormPane">
+      <details class="pg-quickfill" id="pgQuickFill">
+        <summary>⚡ Males isi satu-satu? Tempel format <code>==== topik: …</code> di sini</summary>
+        <div class="pg-quickfill-inner">
+          <p class="pg-note">Tempel satu blok teks berformat, klik <b>Isi form dari teks</b>, semua field kebawah keisi otomatis. Cocok kalau kamu minta ChatGPT nulisin brief-nya dulu dengan format ini.</p>
+          <textarea id="pgBulk" class="pg-bulk" rows="8" spellcheck="false" placeholder="==== topik: Cara menghadapi UTBK tanpa burnout&#10;==== audience: Pelajar SMA, pejuang UTBK&#10;==== slide: 5-7&#10;==== tujuan: Edukasi & motivasi&#10;==== tone: Motivasi edukatif, santai&#10;==== instruksi: Kasih contoh nyata, hindari bahasa kaku"></textarea>
+          <div class="pg-quickfill-tools">
+            <button type="button" class="btn btn-secondary" id="pgBulkFillBtn">Isi form dari teks</button>
+            <button type="button" class="btn btn-dark" id="pgBulkCopyBtn">📋 Copy format buat ChatGPT</button>
+            <button type="button" class="link-btn" id="pgBulkSkeletonBtn">Sisipkan contoh format</button>
+            <button type="button" class="link-btn" id="pgBulkFromFormBtn">Ambil dari form di bawah</button>
+          </div>
+          <span class="pg-note" id="pgBulkStatus"></span>
+          <p class="pg-note">Alur: <b>Copy format buat ChatGPT</b> → paste ke ChatGPT biar diisiin → hasilnya tempel balik ke kotak ini → <b>Isi form dari teks</b> → <b>Generate Prompt</b> → paste lagi ke ChatGPT buat naskah slide-nya.</p>
+        </div>
+      </details>
       <div class="pg-field">
         <label for="pgTopic">Topik <span class="pg-required">*</span></label>
         <input type="text" id="pgTopic" placeholder="Contoh: Cara menghadapi UTBK tanpa burnout" />
@@ -330,6 +345,6 @@
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=27"></script>
+<script type="module" src="app.js?v=28"></script>
 </body>
 </html>
