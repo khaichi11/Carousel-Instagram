@@ -305,7 +305,12 @@
     wrap.style.display = "flex";
     wrap.style.flexDirection = "column";
     wrap.style.width = "100%";
-    if (type === "compare" || type === "figure") { wrap.style.flex = "1"; body.style.justifyContent = "stretch"; }
+    // Figure fills the body (text beside a full-height person). Compare used to fill
+    // too, but that stretched the two columns all the way down and covered a
+    // background photo even when they only held a couple of items — so compare now
+    // hugs its content (top-aligned, both columns still equal height via the flex
+    // row's stretch) and only grows tall when the items actually need the room.
+    if (type === "figure") { wrap.style.flex = "1"; body.style.justifyContent = "stretch"; }
     var usesCard = !!d.bgImage && (type === "cover" || type === "highlight" || type === "cta");
     if (usesCard) wrap.classList.add("text-card");
     BUILDERS[type](d, wrap);
