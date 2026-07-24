@@ -2,7 +2,7 @@ import { parseBrief } from "./import-brief.js?v=22";
 import { downloadPptx } from "./pptx-export.js?v=23";
 import * as store from "./storage.js?v=23";
 import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=24";
-import { listPromptTemplates, loadTemplate, generatePrompt } from "./prompt-engine.js?v=2";
+import { listPromptTemplates, loadTemplate, generatePrompt } from "./prompt-engine.js?v=3";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
@@ -1143,7 +1143,7 @@ const pgImgInclude = document.getElementById("pgImgInclude");
 const pgImgStyle = document.getElementById("pgImgStyle");
 // The fixed base style every generated image shares, so all characters look like one
 // consistent set. Editable in the UI; ChatGPT appends topic-specific action/scene.
-const PG_IMG_STYLE_DEFAULT = "A cozy cinematic 3D animated illustration in portrait orientation (4:5), featuring an original stylized character in a warm, inviting setting. Camera zoomed out to show the full environment, with the character occupying only about 30-40% of the frame to emphasize the cozy atmosphere and surrounding details. The character has large expressive eyes, soft facial features, a minimalist flat face with no visible nose and a tiny simple mouth, clean stylized proportions; cute and original, not based on any existing character or franchise. High-quality CGI rendering, smooth materials, soft global illumination, warm cinematic lighting, colorful yet natural palette, polished family-animation style. No text, no logos, no watermarks, no split-screen, no collage, no before-and-after layout, no extra characters. Single continuous scene. Clean composition with ample negative space for carousel design.";
+const PG_IMG_STYLE_DEFAULT = "A cozy cinematic 3D animated illustration in portrait orientation (4:5), featuring an original stylized character in a warm, inviting setting. Camera zoomed out to show the full environment, with the character occupying only about 30-40% of the frame to emphasize the cozy atmosphere and surrounding details. The character has large expressive eyes, soft facial features, a minimalist flat face with no visible nose and a tiny simple mouth, clean stylized proportions; cute and original, not based on any existing character or franchise. High-quality CGI rendering, smooth materials, soft global illumination, warm cinematic lighting, colorful yet natural palette, polished family-animation style. No text, no logos, no brand names, no trademarks, no copyrighted or trademarked characters, no celebrity likeness, no watermarks, no split-screen, no collage, no before-and-after layout, no extra characters. Single continuous scene. Clean composition with ample negative space for carousel design.";
 let pgCurrentTemplateText = "";
 let pgMode = "form";
 
@@ -1389,13 +1389,21 @@ function buildImagePromptBlock() {
     "portrait 4:5, muka flat tanpa hidung, mata besar, satu adegan tanpa split/collage):",
     base,
     "",
-    "Lalu tambahkan koma dan satu adegan yang mewakili tema keseluruhan carousel:",
-    "karakternya lagi ngapain, ekspresi, dan suasana ruangannya (mis. tema \"pusing\" →",
-    "\"a student clutching their head, overwhelmed by piles of notes in a cozy study room\").",
+    "Lalu tambahkan koma dan satu adegan yang BENAR-BENAR NYAMBUNG sama topik & isi",
+    "carousel ini (bukan adegan generik). Baca dulu judul/isi slide, terus gambarkan:",
+    "karakternya lagi ngapain yang relevan sama topik, ekspresi, benda/aktivitas khas",
+    "topik itu, dan suasananya. Contoh:",
+    "- topik \"pusing belajar\" → \"a student clutching their head, overwhelmed by piles of notes\"",
+    "- topik \"atur keuangan\"  → \"a character happily putting coins into labeled jars at a cozy desk\"",
+    "- topik \"olahraga pagi\"  → \"a character stretching and jogging in a sunny park\"",
     "Aturan:",
+    "- Adegannya WAJIB mencerminkan topik/isi carousel yang di atas — jangan asal.",
     "- Prompt gambarnya dalam bahasa Inggris walau teks slide Bahasa Indonesia.",
     "- Hanya satu baris, taruh paling bawah, setelah slide terakhir.",
-    "- Pertahankan orientasi portrait 4:5 & muka flat; jangan tambah teks/logo/karakter lain.",
+    "- Pertahankan base style di atas apa adanya (portrait 4:5 & muka flat); yang berubah",
+    "  cuma bagian adegan/aktivitasnya. Jangan tambah teks/logo/karakter lain.",
+    "- BEBAS COPYRIGHT: jangan sebut atau tiru brand, merek, franchise, atau karakter",
+    "  yang sudah ada (mis. Disney/Pixar/anime/kartun terkenal); karakter harus original.",
     "",
     "Contoh (SATU baris saja, di paling bawah): // gambar: " + base + ", a student clutching their head, overwhelmed by piles of notes in a cozy sunlit study room",
   ].join("\n");

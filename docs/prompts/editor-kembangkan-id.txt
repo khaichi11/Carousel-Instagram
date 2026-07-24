@@ -35,7 +35,7 @@ Aturan isi per layout:
 - highlight  → satu kalimat punchy, **kata penting** dikasih stabilo
 - list       → tiap poin diawali "- ", boleh format "Judul :: penjelasan"
 - table      → tiap baris "Nama :: Angka" (nomor urut otomatis)
-- compare    → tulis "kiri:" lalu poin-poinnya, terus "kanan:" lalu poin-poinnya
+- compare    → WAJIB ada "judul:" (judul perbandingan, mis. "Salah vs Benar") dulu, lalu "kiri:" + poin-poinnya, terus "kanan:" + poin-poinnya
 - meme       → cukup isi "captop:" dan "capbawah:" (gambarnya saya upload sendiri)
 - figure     → teks di samping figur orang (isi seperti cover)
 - cta        → judul ajakan + sub + tombol

@@ -54,7 +54,9 @@ export async function loadTemplate(id) {
   const tpl = PROMPT_TEMPLATES.find((t) => t.id === id) || PROMPT_TEMPLATES[0];
   if (cache.has(tpl.id)) return cache.get(tpl.id);
   try {
-    const res = await fetch(tpl.file);
+    // Cache-bust so template edits actually reach returning users (the .txt files are
+    // otherwise fetched without a version and can be served stale from browser cache).
+    const res = await fetch(tpl.file + "?v=3");
     if (!res.ok) throw new Error("Failed to load " + tpl.file);
     const text = await res.text();
     cache.set(tpl.id, text);
