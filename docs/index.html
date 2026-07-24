@@ -7,7 +7,7 @@
 <link rel="icon" href="logo/logo.png" />
 <link rel="stylesheet" href="fonts.css" />
 <link rel="stylesheet" href="stage.css?v=26" />
-<link rel="stylesheet" href="style.css?v=27" />
+<link rel="stylesheet" href="style.css?v=28" />
 </head>
 <body class="stage-scope">
 
@@ -321,6 +321,21 @@
       </details>
     </div>
 
+    <!-- Shared by both tabs: tell ChatGPT to also emit an English image-generation
+         prompt per slide, all sharing one fixed base style so the characters look
+         consistent, with topic-specific details appended per image. -->
+    <details class="pg-imgprompt" id="pgImgPromptBox">
+      <summary>
+        <label class="pg-imgtoggle"><input type="checkbox" id="pgImgInclude" checked /> 🎨 Sertakan prompt gambar (English) di hasil</label>
+      </summary>
+      <div class="pg-imgprompt-inner">
+        <p class="pg-note">ChatGPT akan menambah satu <b>prompt gambar bahasa Inggris</b> di tiap slide (sebagai baris <code>//</code> biar nggak ganggu import), memakai base style tetap di bawah + detail sesuai topik slide. Base style-nya bisa kamu ubah.</p>
+        <label class="pg-imglabel" for="pgImgStyle">Base style gambar (dipakai di semua slide, bahasa Inggris)</label>
+        <textarea id="pgImgStyle" class="pg-bulk" rows="4" spellcheck="false"></textarea>
+        <button type="button" class="link-btn" id="pgImgResetBtn">↺ Kembalikan base style default</button>
+      </div>
+    </details>
+
     <div class="pg-actions">
       <button type="button" class="btn btn-ghost" id="pgResetBtn">Reset</button>
       <button type="button" class="btn btn-primary" id="pgGenerateBtn">Generate Prompt</button>
@@ -345,6 +360,6 @@
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=28"></script>
+<script type="module" src="app.js?v=29"></script>
 </body>
 </html>

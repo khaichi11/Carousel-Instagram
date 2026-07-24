@@ -1016,6 +1016,12 @@ const pgMaterial = document.getElementById("pgMaterial");
 const pgMaterialCount = document.getElementById("pgMaterialCount");
 const pgEdSlides = document.getElementById("pgEdSlides");
 const pgEdTone = document.getElementById("pgEdTone");
+// Image-prompt section (shared by both tabs).
+const pgImgInclude = document.getElementById("pgImgInclude");
+const pgImgStyle = document.getElementById("pgImgStyle");
+// The fixed base style every generated image shares, so all characters look like one
+// consistent set. Editable in the UI; ChatGPT appends topic-specific action/scene.
+const PG_IMG_STYLE_DEFAULT = "A cozy cinematic 3D animated character with large expressive eyes, soft facial features, warm lighting, smooth stylized proportions, high-quality CGI, colorful yet natural palette, friendly expression, polished family-animation aesthetic, original character design, no text, no logos, not based on any existing character.";
 let pgCurrentTemplateText = "";
 let pgMode = "form";
 
@@ -1076,6 +1082,7 @@ function initPromptGenerator() {
     opt.value = t.id; opt.textContent = t.label;
     pgEditorTemplate.appendChild(opt);
   });
+  if (!pgImgStyle.value) pgImgStyle.value = PG_IMG_STYLE_DEFAULT;
   syncPgEditorNote();
   syncPgMaterialCount();
 }
@@ -1238,12 +1245,42 @@ function readEditorInputs() {
   };
 }
 
+/* Image-prompt instructions appended to the generated prompt when the checkbox is on.
+ * Tells ChatGPT to emit ONE English image prompt per slide as a "//" comment line
+ * (ignored by the brief importer, so it never breaks the layout) built from the fixed
+ * base style + a topic-specific action/scene — e.g. a "pusing/stress" slide gets a
+ * character clutching their head looking overwhelmed. */
+function buildImagePromptBlock() {
+  const base = (pgImgStyle.value.trim() || PG_IMG_STYLE_DEFAULT);
+  return [
+    "",
+    "=== INSTRUKSI PROMPT GAMBAR (WAJIB) ===",
+    "Selain naskah slide, untuk SETIAP slide tambahkan satu baris prompt gambar",
+    "berbahasa INGGRIS tepat di bawah field slide itu, diawali persis dengan \"// gambar: \"",
+    "(pakai \"//\" supaya diabaikan importer, tapi tetap bisa saya copy).",
+    "",
+    "Setiap prompt gambar HARUS diawali base style tetap ini (jangan diubah, biar semua",
+    "gambar konsisten satu karakter/gaya):",
+    base,
+    "",
+    "Lalu tambahkan koma dan detail spesifik sesuai isi slide: karakternya lagi ngapain,",
+    "ekspresi, dan suasananya yang nyambung sama pesan slide (mis. topik \"pusing\" →",
+    "\"a character clutching their head, overwhelmed, papers flying around\"). Aturan:",
+    "- Tulis prompt gambarnya dalam bahasa Inggris walau teks slide Bahasa Indonesia.",
+    "- Base style-nya identik di semua slide; yang berubah cuma bagian aksi/suasananya.",
+    "- Tanpa teks, tanpa logo, tanpa merek/karakter yang sudah ada.",
+    "",
+    "Contoh satu baris: // gambar: " + base + ", a character clutching their head looking overwhelmed, soft warm indoor lighting",
+  ].join("\n");
+}
+
 async function runPromptGenerator() {
   const inputs = pgMode === "editor" ? readEditorInputs() : readFormInputs();
   if (!inputs) return; // validation already told the user what's missing
   pgCurrentTemplateText = await loadTemplate(inputs._tplId);
   if (!pgCurrentTemplateText) { showToast("Gagal memuat template prompt."); return; }
-  const generated = generatePrompt(pgCurrentTemplateText, inputs);
+  let generated = generatePrompt(pgCurrentTemplateText, inputs);
+  if (pgImgInclude.checked) generated += "\n" + buildImagePromptBlock();
   pgPreview.value = generated;
   pgPreviewBox.style.display = "block";
   pgCharCount.textContent = generated.length.toLocaleString("id-ID") + " karakter";
@@ -1286,6 +1323,7 @@ document.getElementById("pgBulkSkeletonBtn").addEventListener("click", () => {
   pgBulk.focus();
 });
 document.getElementById("pgBulkFromFormBtn").addEventListener("click", bulkFromForm);
+document.getElementById("pgImgResetBtn").addEventListener("click", () => { pgImgStyle.value = PG_IMG_STYLE_DEFAULT; showToast("Base style gambar dikembalikan ke default."); });
 pgEditorTemplate.addEventListener("change", syncPgEditorNote);
 pgMaterial.addEventListener("input", syncPgMaterialCount);
 document.getElementById("pgInsertFormatBtn").addEventListener("click", () => {
