@@ -346,9 +346,12 @@
       </summary>
       <div class="pg-imgprompt-inner">
         <p class="pg-note">ChatGPT akan menambah <b>satu prompt gambar bahasa Inggris</b> di paling bawah naskah (bukan per slide), sebagai baris <code>//</code> biar diabaikan pas build slide tapi tetap kebaca kalau di-copy. Memakai base style tetap di bawah + adegan sesuai tema carousel. Base style-nya bisa kamu ubah.</p>
-        <label class="pg-imglabel" for="pgImgStyle">Base style gambar (dipakai di semua slide, bahasa Inggris)</label>
-        <textarea id="pgImgStyle" class="pg-bulk" rows="4" spellcheck="false"></textarea>
-        <button type="button" class="link-btn" id="pgImgResetBtn">↺ Kembalikan base style default</button>
+        <label class="pg-imglabel" for="pgImgStyle">Base style gambar (portrait 4:5, muka flat — bahasa Inggris)</label>
+        <textarea id="pgImgStyle" class="pg-bulk" rows="7" spellcheck="false"></textarea>
+        <div class="pg-quickfill-tools">
+          <button type="button" class="btn btn-dark" id="pgImgCopyBtn">📋 Copy prompt gambar</button>
+          <button type="button" class="link-btn" id="pgImgResetBtn">↺ Kembalikan base style default</button>
+        </div>
       </div>
     </details>
 
@@ -376,6 +379,6 @@
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=31"></script>
+<script type="module" src="app.js?v=32"></script>
 </body>
 </html>

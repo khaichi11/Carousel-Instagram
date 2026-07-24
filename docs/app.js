@@ -1099,7 +1099,7 @@ const pgImgInclude = document.getElementById("pgImgInclude");
 const pgImgStyle = document.getElementById("pgImgStyle");
 // The fixed base style every generated image shares, so all characters look like one
 // consistent set. Editable in the UI; ChatGPT appends topic-specific action/scene.
-const PG_IMG_STYLE_DEFAULT = "A cozy cinematic 3D animated character with large expressive eyes, soft facial features, warm lighting, smooth stylized proportions, high-quality CGI, colorful yet natural palette, friendly expression, polished family-animation aesthetic, original character design, no text, no logos, not based on any existing character.";
+const PG_IMG_STYLE_DEFAULT = "A cozy cinematic 3D animated illustration in portrait orientation (4:5), featuring an original stylized character in a warm, inviting setting. Camera zoomed out to show the full environment, with the character occupying only about 30-40% of the frame to emphasize the cozy atmosphere and surrounding details. The character has large expressive eyes, soft facial features, a minimalist flat face with no visible nose and a tiny simple mouth, clean stylized proportions; cute and original, not based on any existing character or franchise. High-quality CGI rendering, smooth materials, soft global illumination, warm cinematic lighting, colorful yet natural palette, polished family-animation style. No text, no logos, no watermarks, no split-screen, no collage, no before-and-after layout, no extra characters. Single continuous scene. Clean composition with ample negative space for carousel design.";
 let pgCurrentTemplateText = "";
 let pgMode = "form";
 
@@ -1341,17 +1341,19 @@ function buildImagePromptBlock() {
     "dan JANGAN taruh di dalam slide mana pun.",
     "Wajib diawali \"//\" supaya diabaikan importer (nggak jadi slide), tapi tetap bisa saya copy.",
     "",
-    "Prompt gambar itu HARUS diawali base style tetap ini (jangan diubah):",
+    "Prompt gambar itu HARUS diawali base style tetap ini (JANGAN diubah — sudah",
+    "portrait 4:5, muka flat tanpa hidung, mata besar, satu adegan tanpa split/collage):",
     base,
     "",
     "Lalu tambahkan koma dan satu adegan yang mewakili tema keseluruhan carousel:",
-    "karakternya lagi ngapain, ekspresi, dan suasananya (mis. tema \"pusing\" →",
-    "\"a character clutching their head, overwhelmed, papers flying around\"). Aturan:",
+    "karakternya lagi ngapain, ekspresi, dan suasana ruangannya (mis. tema \"pusing\" →",
+    "\"a student clutching their head, overwhelmed by piles of notes in a cozy study room\").",
+    "Aturan:",
     "- Prompt gambarnya dalam bahasa Inggris walau teks slide Bahasa Indonesia.",
     "- Hanya satu baris, taruh paling bawah, setelah slide terakhir.",
-    "- Tanpa teks, tanpa logo, tanpa merek/karakter yang sudah ada.",
+    "- Pertahankan orientasi portrait 4:5 & muka flat; jangan tambah teks/logo/karakter lain.",
     "",
-    "Contoh (SATU baris saja, di paling bawah): // gambar: " + base + ", a character clutching their head looking overwhelmed, soft warm indoor lighting",
+    "Contoh (SATU baris saja, di paling bawah): // gambar: " + base + ", a student clutching their head, overwhelmed by piles of notes in a cozy sunlit study room",
   ].join("\n");
 }
 
@@ -1405,6 +1407,11 @@ document.getElementById("pgBulkSkeletonBtn").addEventListener("click", () => {
 });
 document.getElementById("pgBulkFromFormBtn").addEventListener("click", bulkFromForm);
 document.getElementById("pgImgResetBtn").addEventListener("click", () => { pgImgStyle.value = PG_IMG_STYLE_DEFAULT; showToast("Base style gambar dikembalikan ke default."); });
+document.getElementById("pgImgCopyBtn").addEventListener("click", async () => {
+  const txt = (pgImgStyle.value.trim() || PG_IMG_STYLE_DEFAULT);
+  try { await copyToClipboard(txt); showToast("Prompt gambar tersalin — paste ke image generator (Midjourney/DALL·E, dsb)."); }
+  catch (e) { pgImgStyle.focus(); pgImgStyle.select(); showToast("Nggak bisa auto-copy — teksnya udah diseleksi, tekan Ctrl+C."); }
+});
 pgEditorTemplate.addEventListener("change", syncPgEditorNote);
 pgMaterial.addEventListener("input", syncPgMaterialCount);
 document.getElementById("pgInsertFormatBtn").addEventListener("click", () => {
