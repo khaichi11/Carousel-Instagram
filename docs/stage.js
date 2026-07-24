@@ -314,7 +314,24 @@
     var usesCard = !!d.bgImage && (type === "cover" || type === "highlight" || type === "cta");
     if (usesCard) wrap.classList.add("text-card");
     BUILDERS[type](d, wrap);
-    
+
+    // Optional "text plate": a rounded, translucent box behind the text so it stays
+    // readable over a busy/bright photo. Only for text-on-background layouts (the
+    // card layouts already sit on their own opaque cards). For figure the plate goes
+    // behind just the text column, not the person. The colour+alpha is inlined; a
+    // distinct class (NOT .text-card) keeps it visible in the PPTX raster background
+    // — .text-card is stripped there, this must not be.
+    if (d.textPlate && { cover: 1, highlight: 1, cta: 1, figure: 1 }[type]) {
+      var plateTarget = type === "figure" ? wrap.querySelector(".fig-text") : wrap;
+      if (plateTarget) {
+        plateTarget.classList.add("has-text-plate");
+        var ph = (d.textPlateColor || "#101138").replace("#", "");
+        var pr = parseInt(ph.slice(0, 2), 16) || 0, pg = parseInt(ph.slice(2, 4), 16) || 0, pb = parseInt(ph.slice(4, 6), 16) || 0;
+        var pa = Math.max(0, Math.min(100, d.textPlateOpacity == null ? 45 : d.textPlateOpacity)) / 100;
+        plateTarget.style.background = "rgba(" + pr + "," + pg + "," + pb + "," + pa + ")";
+      }
+    }
+
     // Regular image (layouts other than meme): image inside the slide + optional caption below.
     if (type !== "meme" && d.image) {
       var imgFrame = el("div", "meme-frame");

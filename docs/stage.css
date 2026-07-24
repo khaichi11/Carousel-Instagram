@@ -361,6 +361,12 @@
 .stage .l-figure svg.fig-ph { width: 78%; height: auto; color: rgba(255,255,255,0.22); }
 .stage[data-theme="light"] .l-figure svg.fig-ph { color: rgba(47,49,139,0.18); }
 
+/* Optional text plate (rounded translucent box behind the text, for readability over
+   a photo). Background colour+alpha is set inline (see stage.js); this only supplies
+   the shape/spacing. On figure it wraps the text column only. */
+.stage .has-text-plate { border-radius: 30px; padding: 34px 38px; }
+.stage .l-figure .fig-text.has-text-plate { padding: 30px 32px; }
+
 /* photo theme frosted text card */
 .stage[data-theme="photo"] .text-card { background: rgba(255,255,255,0.96); color: var(--ink); border-radius: 30px; padding: 40px 42px; box-shadow: 0 26px 70px rgba(0,0,0,0.5); }
 .stage[data-theme="photo"] .text-card .display { color: var(--navy); text-shadow: none; }

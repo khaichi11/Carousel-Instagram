@@ -168,6 +168,7 @@ function freshSlide(base) {
       items: "", colA: "", itemsA: "", colB: "", itemsB: "", capTop: "", capBottom: "",
       textColor: "", titleColor: "", markColor: "", highlightTextColor: "", texture: "", textureTone: "light", textureOpacity: 60, pattern: "", image: null, imageCaption: "", bgImage: null, bgMode: "",
       bgColorMode: "", bgFillType: "solid", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgFit: "contain",
+      textPlate: false, textPlateColor: "#101138", textPlateOpacity: 45,
       capStyleMode: "",
       figureImage: null, figureSide: "right", figureLayer: "back", figX: 50, figY: 50, figScale: 100, figRotate: 0, figFlip: false, figOpacity: 100,
       imgX: 50, imgY: 50, imgZoom: 100,
@@ -616,6 +617,7 @@ function slideData(slide, idx, logo) {
     capStyle: resolveCapStyle(slide),
     bgImage: slide.bgMode === "custom" ? (slide.bgImage || null) : slide.bgMode === "global" ? (state.bgImage || null) : null,
     textColor: slide.textColor, titleColor: slide.titleColor, markColor: slide.markColor, highlightTextColor: slide.highlightTextColor,
+    textPlate: slide.textPlate, textPlateColor: slide.textPlateColor, textPlateOpacity: slide.textPlateOpacity,
     texture: slide.texture, textureTone: slide.textureTone, textureOpacity: slide.textureOpacity, pattern: slide.pattern,
     // Global-mode slides inherit the GLOBAL image transform (position + zoom) so
     // every slide shows the background identically; custom mode keeps its own.
@@ -1991,6 +1993,27 @@ function buildCard(slide, idx) {
     rebuildCard(slide);
   });
   advInner.appendChild(resetColorsBtn);
+
+  // Text plate: a rounded translucent box behind the text to keep it readable over a
+  // photo. Only meaningful for text-on-background layouts (list/table/compare already
+  // sit on opaque cards), so the control only shows for those types.
+  if (({ cover: 1, highlight: 1, cta: 1, figure: 1 })[slide.type]) {
+    const plateWrap = document.createElement("div");
+    const plateToggle = document.createElement("button");
+    plateToggle.type = "button";
+    plateToggle.className = "chip sm" + (slide.textPlate ? " active" : "");
+    plateToggle.textContent = slide.textPlate ? "✓ Plat teks aktif" : "Aktifkan plat teks";
+    plateToggle.addEventListener("click", () => { slide.textPlate = !slide.textPlate; rebuildCard(slide); });
+    plateWrap.appendChild(plateToggle);
+    if (slide.textPlate) {
+      const prow = document.createElement("div"); prow.className = "opt-row"; prow.style.marginTop = "8px";
+      prow.appendChild(colorField(slide, "textPlateColor", "Warna plat", "#101138"));
+      prow.appendChild(buildSingleSlider(slide, "textPlateOpacity", "Kepekatan plat (%)", 0, 100, 45));
+      plateWrap.appendChild(prow);
+    }
+    advInner.appendChild(labeled("Plat Teks (kotak di belakang tulisan)", plateWrap,
+      "Kotak rounded semi-transparan di belakang teks biar kebaca di atas gambar. Turunin kepekatannya sesuai selera."));
+  }
 
   // Background COLOUR per slide: theme default / global / custom override — with a
   // clear indicator of which source this slide is using.
