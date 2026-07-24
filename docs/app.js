@@ -843,8 +843,27 @@ function renderGlobalBgEditor() {
   if (fxHost) {
     fxHost.innerHTML = "";
     fxHost.appendChild(buildBgFxEditor(state.settings, () => { refreshAll(); markDirty(); }));
+    // One-click "make the text readable everywhere except the cover": ensure the
+    // global overlay actually darkens+blurs (fill in a sensible readable preset only
+    // if nothing is set yet, so a custom global overlay is respected), then switch
+    // every slide to global overlay EXCEPT slide 1 — the cover stays clear so its
+    // photo shows off, the rest get the scrim so their text is legible.
+    const readableExceptCover = document.createElement("button");
+    readableExceptCover.type = "button"; readableExceptCover.className = "btn btn-secondary"; readableExceptCover.style.fontSize = "12.5px";
+    readableExceptCover.textContent = "⚡ Blur + gelapkan semua slide (kecuali cover)";
+    readableExceptCover.title = "Slide 1 tetap jernih; slide 2-dst dikasih blur + overlay gelap biar teksnya kebaca";
+    readableExceptCover.addEventListener("click", () => {
+      const st = state.settings;
+      if (!st.ovType && !st.bgBlur) { // nothing configured yet → apply a readable default
+        Object.assign(st, { ovType: "solid", ovC1: "#000000", ovA1: 100, ovBlend: "multiply", ovOpacity: 42, bgBlur: 6 });
+      }
+      state.slides.forEach((s, i) => { s.fxMode = i === 0 ? "" : "global"; });
+      renderGlobalBgEditor();
+      renderSlides();
+    });
+    fxHost.appendChild(readableExceptCover);
     const applyFx = document.createElement("button");
-    applyFx.type = "button"; applyFx.className = "link-btn"; applyFx.textContent = "Terapkan overlay & efek ini ke semua slide";
+    applyFx.type = "button"; applyFx.className = "link-btn"; applyFx.textContent = "Terapkan ke semua slide (termasuk cover)";
     applyFx.addEventListener("click", () => { state.slides.forEach((s) => { s.fxMode = "global"; }); renderSlides(); });
     const clearFx = document.createElement("button");
     clearFx.type = "button"; clearFx.className = "link-btn"; clearFx.textContent = "Matikan di semua slide";
@@ -862,6 +881,7 @@ function renderGlobalBgEditor() {
       "Utuh = seluruh gambar kelihatan (sisanya jadi warna background). Isi penuh = dipotong biar menuhin slide."));
     tHost.appendChild(buildTransformControls(state.settings, "bg", "Posisi & zoom gambar global (berlaku untuk semua slide global)", { alignments: true }));
   }
+  updateGlobalPreview();
 }
 
 /* ---------------- Global settings ---------------- */
@@ -875,6 +895,64 @@ wireDropzone(bgDropzone, bgFileInput, async (file) => {
   refreshAll();
 });
 bgRemoveBtn.addEventListener("click", (e) => { e.stopPropagation(); state.bgImage = null; bgThumb.style.display = "none"; bgPlaceholder.style.display = "flex"; bgRemoveBtn.style.display = "none"; refreshAll(); });
+
+/* ---- Live preview of the GLOBAL background (sticky, next to the controls) ----
+ * Renders a sample slide with bgMode "global" so image position/zoom/fit and the
+ * overlay/effects are visible immediately — no scrolling down to the slide cards.
+ * Two views: "Slide isi" (with the global overlay, to check text readability) and
+ * "Cover" (no overlay, to check the photo shows off clearly on slide 1). */
+const globalBgPreview = document.getElementById("globalBgPreview");
+let gbpReady = false, gbpMode = "content";
+// Uses the REAL slide content so the preview shows the user's actual text, not
+// placeholders: "Cover" clones slide 1 (no overlay — image clear), "Slide isi" clones
+// the first non-cover slide (with the global overlay, to check text readability).
+// Both are forced to bgMode "global" so they display the global background image.
+function gbpSample() {
+  const slides = state.slides || [];
+  if (gbpMode === "cover") {
+    const base = slides[0] || { type: "cover", theme: "dark", title: "Judul cover" };
+    return Object.assign({}, base, { bgMode: "global", fxMode: "" });
+  }
+  // Prefer a slide whose text sits directly on the background (highlight/cta/figure) so
+  // the overlay's effect on readability is actually visible; fall back to any non-cover.
+  const onBg = { highlight: 1, cta: 1, figure: 1 };
+  const content = slides.find((s) => s.type !== "cover" && onBg[s.type]) ||
+    slides.find((s) => s.type !== "cover") || slides[1] || slides[0] ||
+    { type: "highlight", theme: "dark", title: "Teks slide isi tetap **kebaca**" };
+  return Object.assign({}, content, { bgMode: "global", fxMode: "global" });
+}
+function updateGlobalPreview() {
+  if (!globalBgPreview || !gbpReady || !globalBgPreview.contentWindow) return;
+  const data = slideData(gbpSample(), gbpMode === "cover" ? 0 : 1);
+  let ratioH = 1350;
+  if (state.settings.ratio === "1:1") ratioH = 1080;
+  else if (state.settings.ratio === "3:4") ratioH = 1440;
+  else if (state.settings.ratio === "9:16") ratioH = 1920;
+  const scale = 200 / 1080;
+  globalBgPreview.style.height = ratioH + "px";
+  globalBgPreview.style.transform = "scale(" + scale + ")";
+  globalBgPreview.parentElement.style.height = Math.round(ratioH * scale) + "px";
+  globalBgPreview.contentWindow.postMessage({ type: "render", data }, "*");
+}
+if (globalBgPreview) {
+  const markGbpReady = () => { if (gbpReady) return; gbpReady = true; updateGlobalPreview(); };
+  globalBgPreview.addEventListener("load", markGbpReady);
+  // The <iframe src="template.html"> is static markup, so it can finish loading BEFORE
+  // this module attaches the listener above — in which case "load" never fires for us
+  // and the preview would stay blank. Poll readyState as a fallback until it's ready.
+  (function pollGbp(n) {
+    try { if (globalBgPreview.contentDocument && globalBgPreview.contentDocument.readyState === "complete") { markGbpReady(); return; } } catch (e) { /* not accessible yet */ }
+    if (n > 0) setTimeout(() => pollGbp(n - 1), 100);
+  })(40);
+  const setGbpMode = (mode) => {
+    gbpMode = mode;
+    document.getElementById("gbpModeContent").classList.toggle("active", mode === "content");
+    document.getElementById("gbpModeCover").classList.toggle("active", mode === "cover");
+    updateGlobalPreview();
+  };
+  document.getElementById("gbpModeContent").addEventListener("click", () => setGbpMode("content"));
+  document.getElementById("gbpModeCover").addEventListener("click", () => setGbpMode("cover"));
+}
 
 const igInput = document.getElementById("igInput"), webInput = document.getElementById("webInput");
 igInput.value = state.settings.igHandle; webInput.value = state.settings.website;
@@ -2135,7 +2213,7 @@ function rebuildCard(slide) {
   slidesListEl.replaceChild(newCard, old);
   renderSlideNav();
 }
-function refreshAll() { state.slides.forEach((s) => { try { s._send && s._send(); } catch (e) { console.warn("refresh slide gagal:", e); } }); }
+function refreshAll() { state.slides.forEach((s) => { try { s._send && s._send(); } catch (e) { console.warn("refresh slide gagal:", e); } }); updateGlobalPreview(); }
 
 /* ---------------- Font selector (global) ---------------- */
 const fontRow = document.getElementById("fontRow");

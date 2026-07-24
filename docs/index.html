@@ -7,7 +7,7 @@
 <link rel="icon" href="logo/logo.png" />
 <link rel="stylesheet" href="fonts.css" />
 <link rel="stylesheet" href="stage.css?v=26" />
-<link rel="stylesheet" href="style.css?v=28" />
+<link rel="stylesheet" href="style.css?v=29" />
 </head>
 <body class="stage-scope">
 
@@ -135,24 +135,40 @@
     <details class="adv">
       <summary>Background global — gambar &amp; warna</summary>
       <div class="inner">
-        <p class="hint">Background global dipakai oleh slide yang mode background-nya <b>Global</b>; slide bermode <b>Custom</b> tetap memakai miliknya sendiri. Berpindah mode tidak menghapus pengaturan mana pun.</p>
-        <div class="dropzone" id="bgDropzone">
-          <img class="thumb" id="bgThumb" style="display:none" />
-          <div class="placeholder" id="bgPlaceholder"></div>
-          <div class="info"><strong>Gambar background global</strong><span>drag &amp; drop / klik — JPG/PNG</span></div>
-          <div class="actions"><button type="button" class="link-btn danger" id="bgRemoveBtn" style="display:none">Hapus</button></div>
-        </div>
-        <input type="file" accept="image/*" id="bgFileInput" style="display:none" />
-        <div class="chip-row" id="bgGlobalActions" style="margin-top:8px"></div>
-        <div id="bgGlobalTransform" style="margin-top:6px"></div>
-        <div class="field" style="margin-top:14px">
-          <label>Warna / gradasi global</label>
-          <div id="globalBgFill"></div>
-        </div>
-        <div class="field" style="margin-top:14px">
-          <label>Overlay &amp; efek gambar global</label>
-          <span class="field-hint">Buat gambar yang <b>kesilauan</b>: tumpuk warna gelap (multiply/darken), gradasi, vignette, atau blur — teks jadi kebaca tanpa ganti fotonya. Dipakai slide yang mode overlay-nya <b>Global</b>.</span>
-          <div id="globalBgFx"></div>
+        <div class="global-bg-layout">
+          <div class="global-bg-controls">
+            <p class="hint">Background global dipakai oleh slide yang mode background-nya <b>Global</b>; slide bermode <b>Custom</b> tetap memakai miliknya sendiri. Berpindah mode tidak menghapus pengaturan mana pun.</p>
+            <div class="dropzone" id="bgDropzone">
+              <img class="thumb" id="bgThumb" style="display:none" />
+              <div class="placeholder" id="bgPlaceholder"></div>
+              <div class="info"><strong>Gambar background global</strong><span>drag &amp; drop / klik — JPG/PNG</span></div>
+              <div class="actions"><button type="button" class="link-btn danger" id="bgRemoveBtn" style="display:none">Hapus</button></div>
+            </div>
+            <input type="file" accept="image/*" id="bgFileInput" style="display:none" />
+            <div class="chip-row" id="bgGlobalActions" style="margin-top:8px"></div>
+            <div id="bgGlobalTransform" style="margin-top:6px"></div>
+            <div class="field" style="margin-top:14px">
+              <label>Warna / gradasi global</label>
+              <div id="globalBgFill"></div>
+            </div>
+            <div class="field" style="margin-top:14px">
+              <label>Overlay &amp; efek gambar global</label>
+              <span class="field-hint">Buat gambar yang <b>kesilauan</b>: tumpuk warna gelap (multiply/darken), gradasi, vignette, atau blur — teks jadi kebaca tanpa ganti fotonya. Dipakai slide yang mode overlay-nya <b>Global</b>.</span>
+              <div id="globalBgFx"></div>
+            </div>
+          </div>
+          <!-- Sticky live preview so global image/overlay changes are visible without
+               scrolling down to the slide cards. -->
+          <aside class="global-bg-preview">
+            <div class="gbp-frame-wrap">
+              <iframe class="gbp-frame" id="globalBgPreview" src="template.html" title="Preview background global"></iframe>
+            </div>
+            <div class="gbp-toggle">
+              <button type="button" class="chip sm active" id="gbpModeContent" title="Lihat efek overlay pada slide isi (slide 2-dst)">Slide isi</button>
+              <button type="button" class="chip sm" id="gbpModeCover" title="Lihat tampilan cover (slide 1)">Cover</button>
+            </div>
+            <span class="preview-cap">Live preview background global</span>
+          </aside>
         </div>
       </div>
     </details>
@@ -360,6 +376,6 @@
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=30"></script>
+<script type="module" src="app.js?v=31"></script>
 </body>
 </html>

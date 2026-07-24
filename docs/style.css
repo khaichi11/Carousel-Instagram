@@ -331,6 +331,18 @@ input[type="range"]:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(247,180
 .pg-imgtoggle input { width: 16px; height: 16px; accent-color: var(--gold); }
 .pg-imgprompt-inner { padding: 4px 0 12px; display: grid; gap: 8px; }
 .pg-imglabel { font-size: 12px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+/* Global background editor: controls on the left, sticky live preview on the right so
+   image/overlay adjustments are visible without scrolling to the slide cards. */
+.global-bg-layout { display: grid; grid-template-columns: 1fr 232px; gap: 20px; align-items: start; }
+.global-bg-preview { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.gbp-frame-wrap { width: 200px; height: 250px; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.18); background: #101138; }
+.gbp-frame { width: 1080px; height: 1350px; border: 0; transform: scale(0.185185); transform-origin: top left; pointer-events: none; }
+.gbp-toggle { display: flex; gap: 6px; }
+.global-bg-preview .preview-cap { font-size: 11.5px; color: var(--text-soft); text-align: center; }
+@media (max-width: 760px) {
+  .global-bg-layout { grid-template-columns: 1fr; }
+  .global-bg-preview { position: static; order: -1; }
+}
 @media (max-width: 640px) {
   .pg-row { grid-template-columns: 1fr; }
   .pg-dialog { padding: 20px 18px; }
