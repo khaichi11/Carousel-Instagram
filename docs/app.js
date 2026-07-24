@@ -2,7 +2,7 @@ import { parseBrief } from "./import-brief.js?v=22";
 import { downloadPptx } from "./pptx-export.js?v=23";
 import * as store from "./storage.js?v=23";
 import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=24";
-import { listPromptTemplates, loadTemplate, generatePrompt } from "./prompt-engine.js?v=3";
+import { listPromptTemplates, loadTemplate, generatePrompt } from "./prompt-engine.js?v=4";
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 

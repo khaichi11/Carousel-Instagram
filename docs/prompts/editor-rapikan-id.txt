@@ -32,7 +32,8 @@ tombol  : teks tombol pil kuning (khusus slide cta)
 Aturan isi khusus:
 - list     → tiap poin diawali "- ", boleh format "Judul :: penjelasan"
 - table    → tiap baris "Nama :: Angka"
-- compare  → pastikan ada "judul:" (judul perbandingan) dulu, lalu "kiri:" + poinnya, terus "kanan:" + poinnya
+- compare  → WAJIB ada "judul:" (judul perbandingan) + JUDUL tiap kolom: "kiri: <judul kolom kiri>" + poinnya,
+             terus "kanan: <judul kolom kanan>" + poinnya (judul kolom kiri & kanan jangan kosong)
 - meme     → "captop:" dan "capbawah:"
 
 === LARANGAN ===
