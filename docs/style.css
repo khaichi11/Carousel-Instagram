@@ -331,6 +331,13 @@ input[type="range"]:focus::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(247,180
 .pg-imgtoggle input { width: 16px; height: 16px; accent-color: var(--gold); }
 .pg-imgprompt-inner { padding: 4px 0 12px; display: grid; gap: 8px; }
 .pg-imglabel { font-size: 12px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+/* Small 3-choice modal (e.g. the "save before leaving?" prompt). */
+.mini-modal-backdrop { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; background: rgba(10,10,30,0.6); backdrop-filter: blur(3px); }
+.mini-modal { width: min(440px, 92vw); background: #fff; border-radius: 18px; padding: 24px 26px; box-shadow: 0 30px 80px rgba(0,0,0,0.35); }
+.mini-modal h3 { margin: 0 0 8px; font-size: 18px; }
+.mini-modal p { margin: 0 0 18px; font-size: 13.5px; color: var(--text-soft); line-height: 1.55; }
+.mini-modal-actions { display: flex; flex-direction: column; gap: 8px; }
+.mini-modal-actions .btn { width: 100%; justify-content: center; }
 /* Global background editor: controls on the left, sticky live preview on the right so
    image/overlay adjustments are visible without scrolling to the slide cards. */
 .global-bg-layout { display: grid; grid-template-columns: 1fr 232px; gap: 20px; align-items: start; }

@@ -308,26 +308,35 @@ async function autosaveNow() {
 setInterval(() => { if (current.dirty) autosaveNow(); }, 15000); // safety-net interval
 
 async function manualSave(asNew) {
+  // createNew = we're making a brand-new saved project (either "Save As", or the very
+  // first Save of an unsaved draft). Otherwise we overwrite the current saved project.
+  const hadSaved = !!current.savedId;
+  const createNew = asNew || !current.savedId;
   let name = current.name;
-  if (asNew || !current.savedId) {
-    name = prompt("Nama project:", asNew && current.savedId ? current.name + " (salinan)" : current.name);
+  if (createNew) {
+    name = prompt(asNew && current.savedId ? "Nama salinan baru:" : "Nama project:",
+      asNew && current.savedId ? current.name + " (salinan)" : current.name);
     if (name == null) return false;
     name = name.trim() || "Tanpa Judul";
   }
-  const id = (asNew || !current.savedId) ? store.newId("p") : current.savedId;
-  const createdAt = (asNew || !current.savedId) ? Date.now() : current.createdAt;
+  const id = createNew ? store.newId("p") : current.savedId;
+  const createdAt = createNew ? Date.now() : current.createdAt;
   await ensureThumb();
   await store.saveProject({
     id, kind: "saved", name, createdAt, updatedAt: Date.now(),
     autosavedAt: current.lastAuto, thumb: current.thumb, appVersion: 15,
   }, snapshot());
   // the old draft's autosave row now belongs to the saved id
-  if (!current.savedId || asNew) await store.deleteProject("auto_" + (current.savedId || current.draftId)).catch(() => {});
+  if (createNew) await store.deleteProject("auto_" + (current.savedId || current.draftId)).catch(() => {});
   current.savedId = id; current.name = name; current.createdAt = createdAt;
   current.dirty = false; current.lastManual = Date.now();
   updateSaveBadge();
   refreshProjectPanel();
   store.sweepAssets().catch(() => {});
+  // Confirm exactly what happened, so "Simpan" vs "Simpan Sebagai" is never ambiguous.
+  showToast(asNew && hadSaved ? `✓ Disimpan sebagai salinan baru: "${name}"`
+    : createNew ? `✓ Project disimpan: "${name}"`
+    : `✓ Perubahan disimpan ke "${name}"`);
   return true;
 }
 
@@ -403,16 +412,49 @@ function newProject() {
   updateSaveBadge();
 }
 
-/* Warn (Save / Don't save / Cancel — two-step with native dialogs) before an action
- * that leaves unsaved manual changes behind. Returns true when it's ok to proceed. */
+/* One clear 3-way modal (Save / Continue without saving / Cancel) instead of the old
+ * two-step native confirm() chain, which read like it was forcing a save. Resolves to
+ * "save" | "discard" | "cancel". */
+function askLeave(projectName) {
+  return new Promise((resolve) => {
+    const back = document.createElement("div"); back.className = "mini-modal-backdrop";
+    back.innerHTML =
+      '<div class="mini-modal" role="dialog" aria-modal="true">' +
+      '<h3>Lanjut ke project lain?</h3>' +
+      '<p>Perubahan di <b>' + esc(projectName || "project ini") + '</b> belum disimpan permanen. ' +
+      'Autosave otomatis menyimpan salinan pemulihan, jadi aman kalau kamu mau lanjut aja tanpa simpan sekarang.</p>' +
+      '<div class="mini-modal-actions">' +
+      '<button type="button" class="btn btn-primary" data-act="save">Simpan dulu, terus lanjut</button>' +
+      '<button type="button" class="btn btn-secondary" data-act="discard">Lanjut tanpa simpan (autosave aman)</button>' +
+      '<button type="button" class="btn btn-ghost" data-act="cancel">Batal — tetap di sini</button>' +
+      '</div></div>';
+    const done = (v) => { back.remove(); document.removeEventListener("keydown", onKey); resolve(v); };
+    const onKey = (e) => { if (e.key === "Escape") done("cancel"); };
+    back.addEventListener("click", (e) => {
+      if (e.target === back) return done("cancel");
+      const act = e.target.closest("[data-act]"); if (act) done(act.dataset.act);
+    });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(back);
+    const first = back.querySelector('[data-act="save"]'); if (first) first.focus();
+  });
+}
+// esc() for the modal above (mirrors stage.js's escaper — kept local so app.js has no
+// dependency on the renderer just for a project name).
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* Ask before an action that leaves unsaved manual changes behind. Returns true when
+ * it's ok to proceed. Autosave keeps a recovery copy either way. */
 async function confirmLeave() {
   if (typeof generating !== "undefined" && generating) { alert("Tunggu proses generate selesai dulu."); return false; }
   if (!current.dirty) return true;
   await autosaveNow(); // recovery copy is always fresh
-  if (confirm("Ada perubahan yang belum disimpan permanen (autosave aman).\n\nSimpan dulu sebagai project?")) {
-    return await manualSave(false);
-  }
-  return confirm("Lanjut TANPA menyimpan permanen? (Masih bisa dipulihkan dari Autosave)");
+  const choice = await askLeave(current.name);
+  if (choice === "cancel") return false;
+  if (choice === "save") return await manualSave(false);
+  return true; // "discard" = continue; autosave recovery still exists
 }
 window.addEventListener("beforeunload", (e) => {
   if (current.dirty) {
