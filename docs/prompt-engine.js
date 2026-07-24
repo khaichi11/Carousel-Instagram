@@ -56,7 +56,7 @@ export async function loadTemplate(id) {
   try {
     // Cache-bust so template edits actually reach returning users (the .txt files are
     // otherwise fetched without a version and can be served stale from browser cache).
-    const res = await fetch(tpl.file + "?v=4");
+    const res = await fetch(tpl.file + "?v=5");
     if (!res.ok) throw new Error("Failed to load " + tpl.file);
     const text = await res.text();
     cache.set(tpl.id, text);

@@ -106,6 +106,7 @@ function parseChunk(chunk) {
   let afterColon = false; // lines indented under a "…:" line count as bullets
   let curCol = null;      // 'colA' | 'colB' when inside a compare column
   let curGroup = null;
+  let pending = null;     // a "key:" written with its value on the FOLLOWING line(s)
 
   const pushBullet = (b) => {
     if (curCol) colBullets[curCol].push(b);
@@ -117,21 +118,42 @@ function parseChunk(chunk) {
 
   for (const line of chunk.lines) {
     const t = line.trim();
-    if (!t) { loose.push(""); afterColon = false; continue; }
+    if (!t) { loose.push(""); afterColon = false; continue; } // blank keeps `pending` alive
 
     // explicit "key: value"
     const kv = t.match(/^([a-zA-Z]+)\s*[:=]\s*(.*)$/);
     if (kv && FIELD_ALIASES[kv[1].toLowerCase()]) {
       const key = FIELD_ALIASES[kv[1].toLowerCase()];
-      fields[key] = kv[2].trim();
+      const val = kv[2].trim();
+      fields[key] = val;
+      // ChatGPT often writes the field name on one line and the value on the next
+      // ("Judul:\n**...**"). Remember an empty-valued field so the next content line
+      // fills it, instead of the value leaking into the title/subtitle as loose text.
+      pending = val ? null : key;
       if (key === "colA") curCol = "colA";
       else if (key === "colB") curCol = "colB";
       else curGroup = null;
       afterColon = true; // header line introduces its column's items
       continue;
     }
+    // A bare layout keyword on its own line (e.g. ChatGPT writes "cover" instead of
+    // "layout: cover") — treat it as the layout, not as content. Only when no layout
+    // has been set yet, so it can't clobber an explicit "layout:" field.
+    if (!fields.type && VALID_TYPES.includes(t.toLowerCase())) {
+      fields.type = t.toLowerCase();
+      pending = null;
+      continue;
+    }
     const indented = /^\s+\S/.test(line);
+    // Fill a field whose value was written on the line(s) after its "key:". Bullets are
+    // excluded (they belong to the column/list, not the header value).
+    if (pending && !isBulletLine(t)) {
+      fields[pending] = t;
+      pending = null; // one value line only — don't swallow later loose content
+      continue;
+    }
     if (isBulletLine(t) || (afterColon && indented)) {
+      pending = null;
       pushBullet(stripBullet(t));
       continue;
     }

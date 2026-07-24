@@ -15,6 +15,12 @@ Separate every slide using:
 
 === Slide ===
 
+PENTING: tepat di bawah tiap "=== Slide ===", tulis layout-nya sebagai baris
+"layout: <jenis>" (pakai kata "layout:" + jenisnya, mis. "layout: cover").
+JANGAN tulis jenisnya sendirian tanpa "layout:". Nama field lain juga huruf kecil
+diikuti titik dua: judul: / sub: / eyebrow: / tombol: / topik: / captop: / capbawah: /
+kiri: / kanan:. Jangan pakai spasi di nama field (mis. tulis "judul:" bukan "Judul CTA:").
+
 Available layouts:
 - cover       → judul besar + sub + eyebrow opsional
 - highlight   → kalimat punchy dengan **kata penting** yang jadi stabilo
@@ -28,7 +34,9 @@ Available layouts:
 - cta         → judul CTA + tombol ajakan
 
 Highlight format:
-Bungkus kata penting dengan **kata** → jadi stabilo kuning di slide.
+Bungkus HANYA 1-3 kata kunci/hook dengan **kata** → jadi stabilo kuning. JANGAN
+membungkus seluruh judul atau seluruh kalimat dengan ** (cukup kata terpentingnya),
+mis. "Pintar di Sekolah, Kenapa **Belum Tentu Lolos** UTBK?".
 
 Use Indonesian language. Explain technical concepts simply without losing accuracy.
 

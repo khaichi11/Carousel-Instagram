@@ -9,7 +9,9 @@ Kamu adalah content writer carousel Instagram edukasi berbahasa Indonesia. Saya 
 1. Ambil ide inti dari brainstorming di atas, lalu susun jadi kurang-lebih {{SLIDES}} slide dengan alur: hook → masalah → isi/solusi → bukti atau contoh → CTA.
 2. Kembangkan poin yang masih mentah jadi kalimat yang jelas dan enak dibaca — tetap setia pada maksud saya.
 3. Tone tulisan: {{TONE}}. Bahasa Indonesia sehari-hari yang rapi, bukan bahasa formal kaku.
-4. Tandai 1-3 kata terpenting per slide dengan **kata** supaya kena stabilo kuning.
+4. Tandai HANYA 1-3 kata kunci/hook per slide dengan **kata** (stabilo kuning). JANGAN
+   bungkus seluruh judul/kalimat dengan ** — cukup kata terpentingnya saja, mis.
+   "Pintar di Sekolah, Kenapa **Belum Tentu Lolos** UTBK?".
 5. Setiap slide harus bisa dibaca dalam 3-5 detik — kalimat pendek, tanpa paragraf panjang.
 6. Variasikan layout biar carousel-nya nggak monoton (jangan semua slide highlight).
 7. Emoji boleh, tapi seperlunya saja.
@@ -22,6 +24,8 @@ Pisahkan tiap slide dengan baris:
 
 Field per slide (semua opsional, tulis apa adanya dengan huruf kecil diikuti titik dua):
 layout  : cover | highlight | list | table | compare | meme | figure | cta
+          (WAJIB ditulis lengkap sebagai "layout: <jenis>", mis. "layout: cover" —
+           jangan cuma tulis jenisnya sendirian tanpa kata "layout:")
 theme   : dark (navy) | light (terang)
 align   : top | center | bottom  — posisi vertikal teks
 topik   : teks badge pil kuning di pojok kanan atas

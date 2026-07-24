@@ -9,7 +9,9 @@ Kamu adalah editor bahasa Indonesia untuk konten carousel Instagram. Naskah saya
 1. Pertahankan jumlah slide, urutan, dan maksud tiap slide. Jangan menambah atau menghapus slide kecuali ada slide yang benar-benar kembar.
 2. Padatkan kalimat yang kepanjangan supaya muat di slide (judul maksimal ±8 kata, sub maksimal ±2 baris pendek).
 3. Perbaiki typo, tanda baca, huruf besar-kecil, dan kalimat yang janggal. Bahasa Indonesia yang enak dibaca pelajar, tone: {{TONE}}.
-4. Pastikan tiap slide punya 1-3 kata bertanda **kata** untuk stabilo — tambahkan kalau belum ada, kurangi kalau kebanyakan.
+4. Pastikan tiap slide punya HANYA 1-3 kata kunci/hook bertanda **kata** untuk stabilo —
+   tambahkan kalau belum ada, kurangi kalau kebanyakan. JANGAN bungkus seluruh judul/
+   kalimat dengan ** (cukup kata terpentingnya), mis. "...Kenapa **Belum Tentu Lolos** UTBK?".
 5. Betulkan penulisan field yang salah tulis (mis. "Judul:" jadi "judul:", "Sub :" jadi "sub:") dan rapikan poin list jadi diawali "- ".
 6. Kalau ada slide tanpa layout yang jelas, tambahkan baris "layout:" yang paling pas.
 
@@ -21,6 +23,8 @@ Pisahkan tiap slide dengan baris:
 
 Field per slide (semua opsional, huruf kecil diikuti titik dua):
 layout  : cover | highlight | list | table | compare | meme | figure | cta
+          (WAJIB ditulis lengkap sebagai "layout: <jenis>", mis. "layout: cover" —
+           jangan cuma tulis jenisnya sendirian tanpa kata "layout:")
 theme   : dark (navy) | light (terang)
 align   : top | center | bottom
 topik   : teks badge pil kuning di pojok kanan atas
