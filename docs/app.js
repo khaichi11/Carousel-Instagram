@@ -1,5 +1,5 @@
 import { parseBrief } from "./import-brief.js?v=22";
-import { downloadPptx } from "./pptx-export.js?v=22";
+import { downloadPptx } from "./pptx-export.js?v=23";
 import * as store from "./storage.js?v=23";
 import { PRESETS, PRESET_CATEGORIES } from "./presets.js?v=24";
 import { listPromptTemplates, loadTemplate, generatePrompt } from "./prompt-engine.js?v=2";
@@ -3038,12 +3038,17 @@ async function renderSlideForPptx(data) {
   const igPng = await getIgIconPng(exportStage);
   const { els, blocks, images } = collectPptx(exportStage, markHex, data, igPng);
 
-  // Pixel-perfect PPTX: the slide background is a full raster of the rendered
-  // stage (text, shapes, images and all). Editable objects are then layered on
-  // top as transparent overlays so users can still click/select/edit in
-  // PowerPoint / Canva, but the visible output is guaranteed to match the Live
-  // Preview regardless of font substitution or metric differences.
-  const bg = await stageToPng(w, h);
+  // Truly-separable PPTX: rasterize ONLY the background (photo/gradient/pattern/
+  // texture/overlay/plate) by hiding — via the .pptx-bg class — every element that is
+  // re-emitted above as its own editable object (all text, cards/badges/pills, the
+  // foreground pictures, logo and footer glyph). Nothing is baked twice, so in
+  // PowerPoint/Canva each picture and text box can be moved, edited or deleted on its
+  // own instead of being stuck to a flattened image. Measure first (collectPptx above),
+  // THEN hide, so the measurements come from the fully-rendered slide.
+  exportStage.classList.add("pptx-bg");
+  let bg;
+  try { bg = await stageToPng(w, h); }
+  finally { exportStage.classList.remove("pptx-bg"); }
 
   return { bg, els, blocks, images, width: w, height: h };
 }

@@ -1,11 +1,16 @@
 /* Editable, layered PPTX — Canva-first (nothing flattened together):
- *   1. Background raster — gradient/photo/texture/pattern + baked pills/logo/footer.
- *                          A single "background" layer; no words, cards, or images.
- *   2. Editable shapes   — cards/boxes/badges/image-frames as real, movable rects.
- *   3. Editable images   — meme/regular pictures placed at their visible rect.
- *   4. Editable text     — every text block a real text box, fonts named so Canva
- *                          maps them (Anton/Bebas/…); stabilo words keep a run-level
- *                          highlight. So a 10-element slide → 10 editable objects.
+ *   1. Background raster — ONLY gradient/photo/texture/pattern/overlay/plate. The
+ *                          renderer hides every foreground element (.pptx-bg) before
+ *                          this is captured, so no words, cards, pills, logo, footer
+ *                          or pictures are baked in.
+ *   2. Editable shapes   — cards/boxes/badges/pills/image-frames/stabilo as real,
+ *                          filled, movable rects (their true colours).
+ *   3. Editable images   — meme/regular/figure pictures + logo + IG glyph, each a
+ *                          real opaque picture placed at its visible rect.
+ *   4. Editable text     — every text block a real, VISIBLE text box, fonts named so
+ *                          Canva maps them (Anton/Bebas/…); stabilo words keep a
+ *                          run-level highlight. So a 10-element slide → 10 objects
+ *                          you can each move, edit or delete independently.
  *
  * Input `specs`: [{ bg, els:[...], blocks:[...], images:[...], width, height }]
  * (rendering + measuring happen in app.js). 1 px = 1/96 in; font px -> pt = px*0.75.
@@ -31,16 +36,18 @@ export async function downloadPptx(specs, fileName) {
     //    rendered by the browser, so the exported slide looks identical everywhere.
     s.addImage({ data: spec.bg, x: 0, y: 0, w: layoutW, h: layoutH });
 
-    // 2. Editable shape overlays (cards, badges, frames, etc.) — kept transparent
-    //    so the raster background shows through, but users can still select/move
-    //    them in PowerPoint / Canva and change their fill if they want to.
+    // 2. Editable shapes (cards, badges, pills, image frames, stabilo boxes) — real
+    //    filled rectangles, since the background raster no longer contains them. Each
+    //    stays a movable/recolourable object in PowerPoint / Canva.
     (spec.blocks || []).forEach((blk) => {
       const x = Number(blk.x), y = Number(blk.y), w = Number(blk.w), h = Number(blk.h);
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
       const radPx = Math.max(0, Math.min(Number(blk.roundness) || 0, Math.min(w, h) / 2));
+      const fillColor = (blk.fill && blk.fill.color) ? String(blk.fill.color).replace("#", "") : "FFFFFF";
+      const fillTransp = (blk.fill && Number.isFinite(blk.fill.transparency)) ? blk.fill.transparency : 0;
       const opts = {
         x: x * PX, y: y * PX, w: w * PX, h: h * PX,
-        fill: { color: "FFFFFF", transparency: 100 },
+        fill: { color: fillColor, transparency: Math.max(0, Math.min(100, fillTransp)) },
         line: { type: "none" },
       };
       if (blk.rotate) opts.rotate = normRot(blk.rotate);
@@ -61,10 +68,9 @@ export async function downloadPptx(specs, fileName) {
       s.addImage(o);
     });
 
-    // 4. Editable text overlays — same content/font/size/position as the preview,
-    //    but rendered transparent so the raster background text remains visible.
-    //    Users can click the text area and edit; the embedded fonts ensure the
-    //    edited text still uses the intended typeface.
+    // 4. Editable text — real, visible text boxes (the background raster no longer
+    //    contains the words). Same content/font/size/position as the preview; the
+    //    embedded fonts keep the typeface. Stabilo words carry the highlight colour.
     (spec.els || []).forEach((el) => {
       const x = Number(el.x), y = Number(el.y), w = Number(el.w), h = Number(el.h);
       if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return;
@@ -110,11 +116,8 @@ export async function downloadPptx(specs, fileName) {
   try { blob = await pptx.write({ outputType: "blob" }); }
   catch (e) { await pptx.writeFile({ fileName: name }); return; } // fallback
 
-  try {
-    blob = await makeTextTransparent(blob);
-  } catch (e) {
-    console.warn("Text transparency skipped:", e && e.message);
-  }
+  // (Text is kept visible now — the background raster no longer carries a baked copy,
+  // so the old makeTextTransparent() post-process is intentionally not run.)
 
   try {
     blob = await embedFonts(blob, families);
