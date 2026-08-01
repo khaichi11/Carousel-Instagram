@@ -203,7 +203,7 @@ function defaultStory() {
     titleSize: 82,
     subtitle: "Penjelasan lengkapnya ada di postingan ini!",
     subSize: 33, subIcon: "tap",
-    cardFrame: true, cardRotate: 0, cardScale: 100,
+    cardFrame: false, cardRotate: 0, cardScale: 100,
     ctaTop: "Tap postingan ini", ctaBottom: "untuk penjelasan lengkapnya!",
     // Handles already appear inside the post itself; off by default so the story
     // doesn't repeat them twice.
@@ -2850,7 +2850,7 @@ function renderStoryEditor() {
   g4.appendChild(text("brandName", "Nama brand (atas)", "Pasti Pintar"));
   g4.appendChild(labeled("Elemen yang ditampilkan", toggleRow(
     toggle("showLogo", "Logo", "Logo"),
-    toggle("cardFrame", "Bingkai putih", "Bingkai putih"),
+    toggle("cardFrame", "Kotak postingan", "Tanpa kotak"),
     toggle("showArrow", "Panah", "Panah"),
     toggle("showLink", "Ikon link", "Ikon link"),
     toggle("showHandles", "Handle IG", "Handle IG")
@@ -3112,6 +3112,10 @@ async function downloadStory() {
   try {
     window.renderStory(storyExportStage, data);
     await waitImages(storyExportStage);
+    const storyBackground = storyExportStage.querySelector(".st-bg-img");
+    if (storyBackground && storyBackground.decode) {
+      try { await storyBackground.decode(); } catch (e) { /* already loaded or unsupported */ }
+    }
     await ensureStoryFonts(storyExportStage);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     window.refitStory(storyExportStage); // re-fit now that the real fonts are loaded
