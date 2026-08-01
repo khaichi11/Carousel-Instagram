@@ -188,7 +188,8 @@ function defaultStory() {
   return {
     srcIndex: 0,        // which generated PNG is featured (ignored once postImage is set)
     postImage: null,    // uploaded override for the card
-    bgSame: true,       // background = the same image as the card
+    showPost: false,    // generated slides only appear as a post when explicitly enabled
+    bgSame: false,      // background is independent from the post by default
     bgImage: null,      // uploaded override for the background
     blur: 30, darken: 48, bgZoom: 115, bgX: 50, bgY: 50, bgSaturate: 105,
     vignette: true, grain: true, sparkles: true,
@@ -2687,9 +2688,10 @@ function storyData() {
   syncStoryText();
   const st = state.story;
   const post = storyPostSrc();
+  const background = st.bgSame ? post : st.bgImage;
   return Object.assign({}, st, {
-    postImage: post,
-    bgImage: st.bgSame ? post : (st.bgImage || post),
+    postImage: st.showPost ? post : null,
+    bgImage: background || null,
     subIcon: (st.subIcon || "auto") === "auto" ? storyIconFor(storySourceSlide(), st) : st.subIcon,
     logo: LOGO_DATAURL,
     igHandle: st.showHandles ? state.settings.igHandle : "",
@@ -2781,7 +2783,7 @@ function renderStoryEditor() {
       b.addEventListener("click", () => { st.srcIndex = i; st.postImage = null; storyChanged(true); });
       grid.appendChild(b);
     });
-    g1.appendChild(labeled("Slide yang ditampilkan", grid));
+    g1.appendChild(labeled("Slide untuk postingan", grid));
   } else {
     const e = document.createElement("div"); e.className = "story-empty";
     e.innerHTML = "Belum ada PNG. Klik <b>Generate PNG</b> dulu di atas — atau langsung upload gambar postingan di bawah.";
@@ -2791,9 +2793,12 @@ function renderStoryEditor() {
     buildImageDropzone(st, "postImage", () => storyChanged(true), "menimpa pilihan slide di atas"),
     st.postImage ? "Sedang pakai gambar upload — hapus buat balik ke slide hasil generate." : ""));
 
+  g1.appendChild(labeled("Postingan di Story", toggleRow(
+    toggle("showPost", "Ditampilkan", "Disembunyikan")
+  ), "Saat disembunyikan, kartu postingan tidak muncul di preview maupun hasil download."));
   g1.appendChild(labeled("Sumber gambar latar", toggleRow(
     toggle("bgSame", "Sama dengan postingan", "Pakai gambar sendiri", true)
-  ), "Kalau dimatikan, kamu bisa upload foto lain khusus buat latar belakangnya."));
+  ), "Pakai gambar sendiri agar latar tidak menggunakan slide hasil generate."));
   if (!st.bgSame) {
     g1.appendChild(labeled("Upload gambar latar", buildImageDropzone(st, "bgImage", () => storyChanged(true), "JPG/PNG — dipakai sebagai latar blur")));
   }
@@ -2980,7 +2985,7 @@ function renderStoryEditor() {
           return storyExportStage;
         };
         const referenceStory = await renderStressStory(original);
-        const referenceCard = referenceStory.querySelector(".st-card").getBoundingClientRect();
+        const referenceCard = referenceStory.querySelector(".st-card");
         const referenceRoot = referenceStory.getBoundingClientRect();
         const referenceScale = referenceRoot.width / 1080 || 1;
         const referenceThumbnail = referenceStory.cloneNode(true);
@@ -2991,7 +2996,7 @@ function renderStoryEditor() {
           font: "Acuan aktif",
           title: original.title || "-",
           subtitle: original.subtitle || "-",
-          cardHeight: Math.round(referenceCard.height / referenceScale),
+          cardHeight: referenceCard ? Math.round(referenceCard.getBoundingClientRect().height / referenceScale) : null,
           problems: [],
           thumbnail: referenceThumbnail,
           reference: true,
@@ -3012,7 +3017,7 @@ function renderStoryEditor() {
                 return { left: (rect.left - rootRect.left) / scale, top: (rect.top - rootRect.top) / scale, right: (rect.right - rootRect.left) / scale, bottom: (rect.bottom - rootRect.top) / scale };
               };
               const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-              const sparks = [0, 1, 2].map((index) => local(".st-spark", index));
+              const sparks = [0, 1].map((index) => local(".st-spark", index));
               const titleBox = local(".st-title");
               const subBox = local(".st-sub");
               const badgeBox = local(".st-badge");
@@ -3022,12 +3027,12 @@ function renderStoryEditor() {
               if (overlaps(sparks[0], badgeBox)) problems.push("garis badge");
               if (overlaps(sparks[1], linkBox)) problems.push("garis link");
               if (innerBox.bottom > 1920.5) problems.push("keluar kanvas");
-              const cardBox = local(".st-card");
+              const card = testStory.querySelector(".st-card");
               const thumbnail = testStory.cloneNode(true);
               thumbnail.removeAttribute("id");
               thumbnail.style.transform = "scale(0.1)";
               thumbnail.style.transformOrigin = "top left";
-              results.push({ font: fontOption.id, title: titleValue, subtitle: subtitleValue, cardHeight: Math.round(cardBox.bottom - cardBox.top), problems, thumbnail });
+              results.push({ font: fontOption.id, title: titleValue, subtitle: subtitleValue, cardHeight: card ? Math.round(card.getBoundingClientRect().height / scale) : null, problems, thumbnail });
               if (problems.length) failures.push(fontOption.id + ": " + titleValue.slice(0, 18) + " / " + subtitleValue.slice(0, 18));
             }
           }
@@ -3045,7 +3050,7 @@ function renderStoryEditor() {
           preview.appendChild(item.thumbnail);
           previewCell.appendChild(preview);
           const status = item.reference ? "Sama dengan preview utama" : item.problems.length ? `Perlu cek: ${item.problems.join(", ")}` : "Aman";
-          [item.font, item.title, item.subtitle, item.cardHeight + "px", status].forEach((value) => {
+          [item.font, item.title, item.subtitle, item.cardHeight == null ? "Disembunyikan" : item.cardHeight + "px", status].forEach((value) => {
             const cell = document.createElement("td"); cell.textContent = value; rowEl.appendChild(cell);
           });
           rowEl.insertBefore(previewCell, rowEl.firstChild);
@@ -3096,8 +3101,8 @@ async function ensureStoryFonts(root) {
 }
 async function downloadStory() {
   const data = storyData();
-  if (!data.postImage) {
-    storyStatus.textContent = "Belum ada gambar postingan — klik Generate PNG dulu, atau upload gambar di bagian 1.";
+  if (!data.bgImage) {
+    storyStatus.textContent = "Belum ada gambar latar — upload gambar latar di bagian 1.";
     storyStatus.className = "status-msg error";
     return;
   }

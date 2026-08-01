@@ -241,17 +241,19 @@
       inner.appendChild(sub);
     }
 
-    /* The post itself, framed like a shared card */
-    var card = el("div", "st-card" + (d.cardFrame === false ? " bare" : ""));
-    applyDebugTransform(card, d, "debugCard", "rotate(" + (d.cardRotate || 0) + "deg) scale(" + ((d.cardScale || 100) / 100) + ")");
-    if (d.postImage) {
-      var pi = document.createElement("img");
-      pi.className = "st-card-img"; pi.src = d.postImage;
-      card.appendChild(pi);
-    } else {
-      card.appendChild(el("div", "st-card-empty", "Generate PNG dulu,<br>lalu pilih slide-nya di sini"));
+    /* The post card is optional; background-only Stories export without it. */
+    if (d.showPost === true) {
+      var card = el("div", "st-card" + (d.cardFrame === false ? " bare" : ""));
+      applyDebugTransform(card, d, "debugCard", "rotate(" + (d.cardRotate || 0) + "deg) scale(" + ((d.cardScale || 100) / 100) + ")");
+      if (d.postImage) {
+        var pi = document.createElement("img");
+        pi.className = "st-card-img"; pi.src = d.postImage;
+        card.appendChild(pi);
+      } else {
+        card.appendChild(el("div", "st-card-empty", "Pilih gambar postingan di bagian 1"));
+      }
+      inner.appendChild(card);
     }
-    inner.appendChild(card);
 
     /* Footer CTA: hooked arrow + two-line call to action + link chip */
     var cta = el("div", "st-cta");
@@ -287,7 +289,10 @@
     var inner = root.querySelector(".st-inner");
     if (!inner) return;
     var card = inner.querySelector(".st-card");
-    if (!card) return;
+    if (!card) {
+      placeSparks(root);
+      return;
+    }
     var avail = inner.clientHeight;
     if (!avail) return;
     var need = 0;
