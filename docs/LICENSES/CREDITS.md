@@ -33,6 +33,16 @@ Teks lisisensi tiap library ada di `LICENSES/libraries/`.
 
 ## Aset lain
 
+- **Dekorasi Story Instagram** (`docs/story.js`) — semua digambar sendiri sebagai SVG
+  inline dari garis dan lingkaran dasar: coretan/percikan kuning-putih (`SPARKS` +
+  `sparkSvg`), panah melengkung (`SVG_ARROW`), ikon jam (`SVG_CLOCK`), rantai/link
+  (`SVG_LINK`), telunjuk-tap (`SVG_TAP`), dan bingkai video (`SVG_PLAY`). Tidak ada
+  berkas gambar, icon pack, sticker, atau template dari pihak lain — jadi hasil story
+  bebas dipakai komersial tanpa atribusi. Blur, vignette, grain, dan gradasi
+  scrim-nya murni CSS (`docs/story.css`), bukan tekstur hasil download.
+- **Panel debug Story** (`/debug`) — hanya memakai input HTML dan kode JavaScript
+  proyek untuk mengubah posisi, ukuran, serta rotasi SVG dekorasi yang sama. Panel ini
+  tidak memuat aset, font, atau ikon tambahan dari pihak ketiga.
 - **Logo Pasti Pintar** — milik kamu sendiri (bukan aset pihak ketiga).
 - **Warna brand** (navy `#2F318B`, gold `#F7B400`, biru `#008FD7`) — diambil dari logo.
 - **Texture/pattern & gradient** — dibuat pakai CSS/SVG di dalam kode ini sendiri,

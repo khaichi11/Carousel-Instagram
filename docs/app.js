@@ -181,6 +181,50 @@ function freshSlide(base) {
   s.capStyle = Object.assign(defaultCapStyle(), base.capStyle || {});
   return s;
 }
+/* Story (9:16) config — one per project. The story reuses a generated slide PNG as
+ * both its blurred background and the framed card in the middle, so it has no slide
+ * list of its own; everything here is presentation. */
+function defaultStory() {
+  return {
+    srcIndex: 0,        // which generated PNG is featured (ignored once postImage is set)
+    postImage: null,    // uploaded override for the card
+    bgSame: true,       // background = the same image as the card
+    bgImage: null,      // uploaded override for the background
+    blur: 30, darken: 48, bgZoom: 115, bgX: 50, bgY: 50, bgSaturate: 105,
+    vignette: true, grain: true, sparkles: true,
+    showLogo: true, brandName: "Pasti Pintar",
+    badge: "POST BARU!", badgeTilt: -1,
+    // autoText on = headline/sub are derived from the featured slide, so the story
+    // always talks about THIS carousel's topic. The literals below are only the
+    // fallback for a project with no slides yet — deliberately topic-neutral.
+    autoText: true,
+    title: "Ada **Postingan Baru** Buat Kamu!",
+    titleSize: 82,
+    subtitle: "Penjelasan lengkapnya ada di postingan ini!",
+    subSize: 33, subIcon: "tap",
+    cardFrame: true, cardRotate: 0, cardScale: 100,
+    ctaTop: "Tap postingan ini", ctaBottom: "untuk penjelasan lengkapnya!",
+    // Handles already appear inside the post itself; off by default so the story
+    // doesn't repeat them twice.
+    showArrow: true, showLink: true, showHandles: false,
+    accent: "#F7B400", accentInk: "#101138", textColor: "#FFFFFF",
+    font: "Anton",
+    // Canvas coordinates for the Story decoration debug panel. Kept in project
+    // state so a tuned composition exports exactly as shown in the preview.
+    sparkManual: false,
+    sparkBadgeManual: true, sparkLinkManual: true,
+    sparkBadgeX: 349, sparkBadgeY: 190, sparkBadgeRotate: -32, sparkBadgeSize: 70,
+    sparkLinkX: 934, sparkLinkY: 1733, sparkLinkRotate: 60, sparkLinkSize: 61,
+    debugBrandX: 0, debugBrandY: 0, debugBrandScale: 129, debugBrandRotate: 0,
+    debugLogoHeight: 96, debugBrandFont: "Plus Jakarta Sans", debugBrandNameSize: 44,
+    debugBadgeX: 0, debugBadgeY: 48, debugBadgeScale: 100, debugBadgeRotate: 0,
+    debugTitleX: 0, debugTitleY: 64, debugTitleScale: 100, debugTitleRotate: 0,
+    debugSubX: 0, debugSubY: 76, debugSubScale: 100, debugSubRotate: 0,
+    debugCardX: 0, debugCardY: 20, debugCardScale: 87, debugCardRotate: 0,
+    debugCtaX: 0, debugCtaY: -18, debugCtaScale: 100, debugCtaRotate: 0,
+    debugLinkX: 0, debugLinkY: 0, debugLinkScale: 100, debugLinkRotate: 0,
+  };
+}
 const state = {
   bgImage: null,
   briefText: "",
@@ -189,6 +233,7 @@ const state = {
     bgX: 50, bgY: 50, bgScale: 100,
     capStyle: defaultCapStyle() }),
   slides: DEFAULT_SLIDES.map(freshSlide),
+  story: defaultStory(),
 };
 // Lets shared controls (transform sliders) bound to settings repaint every slide.
 state.settings._send = () => { refreshAll(); markDirty(); };
@@ -249,6 +294,7 @@ function snapshot() {
     briefText: state.briefText,
     slides: state.slides.map((s) => { const c = Object.assign({}, s); delete c._send; return c; }),
     pngs: lastPngs.slice(),
+    story: Object.assign({}, state.story),
   };
 }
 function autoMeta() {
@@ -389,6 +435,9 @@ function applyProject(meta, content) {
     state.briefText = content.briefText || "";
     state.slides = (content.slides && content.slides.length ? content.slides : DEFAULT_SLIDES).map(freshSlide);
     lastPngs = (content.pngs || []).filter(Boolean);
+    // Older projects predate the story feature — fall back to the defaults so the
+    // panel is always usable instead of rendering from undefined fields.
+    state.story = Object.assign(defaultStory(), content.story || {});
     syncGlobalInputs();
     renderSlides();
     renderGallery();
@@ -404,6 +453,7 @@ function newProject() {
     state.bgImage = null; state.briefText = "";
     Object.assign(state.settings, defaultFx(), { bgFillType: "", bgC1: "#2F318B", bgC2: "#101138", bgAngle: 155, bgFit: "contain", bgX: 50, bgY: 50, bgScale: 100, capStyle: defaultCapStyle() });
     state.slides = DEFAULT_SLIDES.map(freshSlide);
+    state.story = defaultStory();
     lastPngs = [];
     syncGlobalInputs();
     renderSlides();
@@ -2534,6 +2584,9 @@ function renderGallery() {
   const has = lastPngs.length > 0;
   gallerySection.style.display = has ? "block" : "none";
   downloadZipBtn.style.display = has ? "inline-flex" : "none";
+  // Newly generated slides are the story's image source, so its picker + preview
+  // have to follow whatever the gallery now holds.
+  renderStoryEditor();
 }
 generateBtn.addEventListener("click", generatePng);
 generateBtnTop.addEventListener("click", generatePng);
@@ -2543,6 +2596,537 @@ downloadZipBtn.addEventListener("click", async () => {
   const zip = new window.JSZip();
   lastPngs.forEach((p, i) => zip.file(`slide-${i + 1}.png`, p.split(",")[1], { base64: true }));
   downloadBlob(await zip.generateAsync({ type: "blob" }), "carousel.zip");
+});
+
+/* ================= Instagram Story (9:16) =================
+ * Turns a generated slide into a shareable story background: the same image blurred
+ * behind, the post framed on top, plus badge/headline/arrow/link decorations. Every
+ * decoration is inline SVG drawn in story.js and the type is the bundled OFL font
+ * set, so nothing here introduces a licensed asset. */
+const storyControls = document.getElementById("storyControls");
+const storyPreview = document.getElementById("storyPreview");
+const storyPreviewFrame = document.getElementById("storyPreviewFrame");
+const storyStatus = document.getElementById("storyStatus");
+const storyExportStage = document.getElementById("storyExportStage");
+const storyDownloadBtn = document.getElementById("storyDownloadBtn");
+const isStoryDebugRoute = window.location.pathname.replace(/\/+$/, "") === "/debug";
+
+const STORY_ICONS = [
+  { id: "auto", label: "Otomatis (ikut isi slide)" },
+  { id: "clock", label: "Jam — soal waktu" }, { id: "alert", label: "Peringatan — jangan/salah" },
+  { id: "bulb", label: "Lampu — tips/strategi" }, { id: "list", label: "List — langkah/poin" },
+  { id: "target", label: "Target — nilai/tujuan" }, { id: "chart", label: "Grafik — data/ranking" },
+  { id: "book", label: "Buku — materi/belajar" }, { id: "spark", label: "Bintang" },
+  { id: "tap", label: "Tap" }, { id: "link", label: "Link" }, { id: "none", label: "Tanpa ikon" },
+];
+/* Auto icon: pick from the carousel's own wording so a chemistry post doesn't get the
+ * time-management clock. Ordered most-specific first — the first rule that matches the
+ * combined topic/eyebrow/title/subtitle text wins. */
+const STORY_ICON_RULES = [
+  [/waktu|menit|detik|jam\b|durasi|deadline|timer|kecepatan|buru-buru|ngebut|sisa/, "clock"],
+  [/peringkat|ranking|statistik|persen|grafik|data\b|rata-rata|jumlah|survei/, "chart"],
+  [/target|tujuan|goal|nilai|skor|score|passing|lolos|diterima|snbt|utbk|ptn/, "target"],
+  [/jangan|salah|hindari|stop\b|awas|bahaya|gagal|keliru|kesalahan|jebakan|rugi|telat/, "alert"],
+  [/langkah|urutan|checklist|tahap|\d+\s*(hal|cara|poin|langkah|tips|alasan)/, "list"],
+  [/tips|trik|rahasia|strategi|cara\b|solusi|ide\b|hack/, "bulb"],
+  [/belajar|materi|jurusan|kampus|kuliah|sekolah|pelajaran|soal|ujian|buku|catatan|rumus/, "book"],
+];
+function storyIconFor(slide, st) {
+  if (!slide) return "tap";
+  const hay = [slide.topic, slide.eyebrow, slide.title, slide.subtitle, st && st.subtitle]
+    .join(" ").toLowerCase();
+  const hit = STORY_ICON_RULES.find(([re]) => re.test(hay));
+  return hit ? hit[1] : "tap";
+}
+
+/* The featured post: an explicit upload wins, otherwise the picked generated slide
+ * (clamped, so deleting slides can't leave the picker pointing past the end). */
+function storyPostSrc() {
+  const st = state.story;
+  if (st.postImage) return st.postImage;
+  if (!lastPngs.length) return null;
+  return lastPngs[Math.min(Math.max(st.srcIndex || 0, 0), lastPngs.length - 1)];
+}
+/* The slide the featured PNG came from — the source of the story's wording. Null when
+ * the user uploaded their own image, since then there's no slide to read. */
+function storySourceSlide() {
+  if (state.story.postImage || !state.slides.length) return null;
+  return state.slides[Math.min(Math.max(state.story.srcIndex || 0, 0), state.slides.length - 1)] || null;
+}
+/* Build the story's headline + sub-line out of the featured slide. The `**stabilo**`
+ * markers survive verbatim because the story renderer understands the same syntax as
+ * the slide brief, so a hook keeps the exact words the user already highlighted. */
+function storyTextFromSlide(slide) {
+  if (!slide) return null;
+  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const title = clean(slide.title) || clean(slide.capTop) || clean(slide.eyebrow) || clean(slide.topic);
+  if (!title) return null;
+  let subtitle = clean(slide.subtitle) || clean(slide.eyebrow);
+  if (!subtitle) {
+    // No supporting line on the slide — tease with its topic, or its first point.
+    const topic = clean(slide.topic);
+    const firstItem = clean(String(slide.items || slide.itemsA || "").split("\n")[0].split("::")[0]);
+    subtitle = topic ? `Bahas **${topic}** — selengkapnya ada di postingan ini!`
+      : firstItem ? `Mulai dari **${firstItem}** — selengkapnya di postingan ini!`
+      : "Penjelasan lengkapnya ada di postingan ini!";
+  }
+  return { title, subtitle };
+}
+/* Keep the stored text in step with the featured slide while autoText is on. Writes
+ * only on a real change, so it can safely run on every render. */
+function syncStoryText() {
+  const st = state.story;
+  if (!st.autoText) return;
+  const t = storyTextFromSlide(storySourceSlide());
+  if (!t) return;
+  if (st.title !== t.title) st.title = t.title;
+  if (st.subtitle !== t.subtitle) st.subtitle = t.subtitle;
+}
+
+function storyData() {
+  syncStoryText();
+  const st = state.story;
+  const post = storyPostSrc();
+  return Object.assign({}, st, {
+    postImage: post,
+    bgImage: st.bgSame ? post : (st.bgImage || post),
+    subIcon: (st.subIcon || "auto") === "auto" ? storyIconFor(storySourceSlide(), st) : st.subIcon,
+    logo: LOGO_DATAURL,
+    igHandle: st.showHandles ? state.settings.igHandle : "",
+    website: st.showHandles ? state.settings.website : "",
+  });
+}
+
+/* Preview = the real 1080x1920 story shrunk with a transform, so the preview and the
+ * exported PNG can never drift apart. Re-scaled whenever the column resizes. */
+function scaleStoryPreview() {
+  const w = storyPreviewFrame.clientWidth;
+  if (!w) return;
+  storyPreview.style.transform = `scale(${w / 1080})`;
+}
+function updateStoryPreview() {
+  window.renderStory(storyPreview, storyData());
+  scaleStoryPreview();
+}
+if (window.ResizeObserver) new ResizeObserver(scaleStoryPreview).observe(storyPreviewFrame);
+
+/* Edits repaint the preview and mark the project dirty, but must NOT rebuild the
+ * control panel — that would drop focus mid-typing. `structural` is for changes that
+ * alter which controls exist (e.g. switching the background source). */
+let storyBuilding = false;
+function storyChanged(structural) {
+  // buildImageDropzone fires its onChange once while mounting an existing image; a
+  // structural rebuild from inside the build would recurse forever.
+  if (storyBuilding) return;
+  if (structural) renderStoryEditor(); else updateStoryPreview();
+  markDirty();
+}
+
+function renderStoryEditor() {
+  if (!storyControls) return;
+  const st = state.story;
+  storyBuilding = true;
+  syncStoryText(); // fields must show the derived text, not the value it replaces
+  storyControls.innerHTML = "";
+
+  const group = (title, open) => {
+    const d = document.createElement("details"); d.className = "adv"; if (open) d.open = true;
+    const s = document.createElement("summary"); s.textContent = title; d.appendChild(s);
+    const inner = document.createElement("div"); inner.className = "inner"; d.appendChild(inner);
+    storyControls.appendChild(d);
+    return inner;
+  };
+  const hint = (html) => { const p = document.createElement("p"); p.className = "hint"; p.innerHTML = html; return p; };
+  const row = (...nodes) => { const r = document.createElement("div"); r.className = "opt-row"; nodes.forEach((n) => r.appendChild(n)); return r; };
+  const text = (key, label, placeholder, tip) => {
+    const i = document.createElement("input"); i.type = "text"; i.value = st[key] || ""; i.placeholder = placeholder || "";
+    i.addEventListener("input", () => { st[key] = i.value; storyChanged(); });
+    return labeled(label, i, tip);
+  };
+  const area = (key, label, rows, tip, locked) => {
+    const t = document.createElement("textarea"); t.rows = rows || 2; t.value = st[key] || "";
+    if (locked) { t.readOnly = true; t.style.background = "#F4F5FB"; t.style.color = "var(--text-soft)"; }
+    t.addEventListener("input", () => { st[key] = t.value; storyChanged(); });
+    return labeled(label, t, tip);
+  };
+  const slider = (key, label, min, max, def) => buildObjSlider(st, key, label, min, max, def, () => storyChanged());
+  const color = (key, label, def) => {
+    const i = document.createElement("input"); i.type = "color"; i.value = st[key] || def;
+    i.addEventListener("input", () => { st[key] = i.value; storyChanged(); });
+    return labeled(label, i);
+  };
+  const pick = (key, label, options, tip) =>
+    labeled(label, dropdown(options, st[key], (v) => { st[key] = v; storyChanged(); }), tip);
+  // Boolean = a chip that flips itself in place (matches the plat-teks toggle style).
+  // `structural` is for flags that change WHICH controls exist — those rebuild the
+  // panel instead, so e.g. turning off "sama dengan postingan" reveals its upload box.
+  const toggle = (key, onLabel, offLabel, structural) => {
+    const b = document.createElement("button"); b.type = "button";
+    const paint = () => { b.className = "chip sm" + (st[key] ? " active" : ""); b.textContent = st[key] ? "✓ " + onLabel : (offLabel || onLabel); };
+    b.addEventListener("click", () => { st[key] = !st[key]; paint(); storyChanged(structural); });
+    paint();
+    return b;
+  };
+  const toggleRow = (...chips) => { const r = document.createElement("div"); r.className = "chip-row"; chips.forEach((c) => r.appendChild(c)); return r; };
+
+  /* --- 1. Source --- */
+  const g1 = group("1 · Postingan yang mau dipromosiin", true);
+  g1.appendChild(hint("Pilih slide hasil <b>Generate PNG</b> di atas — gambar itu dipakai dua kali: jadi kartu di tengah <i>dan</i> jadi latar yang di-blur. Mau pakai gambar lain? Upload di bawah."));
+  if (lastPngs.length) {
+    const grid = document.createElement("div"); grid.className = "story-src-grid";
+    lastPngs.forEach((src, i) => {
+      const b = document.createElement("button"); b.type = "button";
+      b.className = "story-src-thumb" + (!st.postImage && (st.srcIndex || 0) === i ? " active" : "");
+      b.innerHTML = `<img src="${src}" alt="Slide ${i + 1}" /><span>${i + 1}</span>`;
+      b.addEventListener("click", () => { st.srcIndex = i; st.postImage = null; storyChanged(true); });
+      grid.appendChild(b);
+    });
+    g1.appendChild(labeled("Slide yang ditampilkan", grid));
+  } else {
+    const e = document.createElement("div"); e.className = "story-empty";
+    e.innerHTML = "Belum ada PNG. Klik <b>Generate PNG</b> dulu di atas — atau langsung upload gambar postingan di bawah.";
+    g1.appendChild(e);
+  }
+  g1.appendChild(labeled("Upload gambar postingan sendiri (opsional)",
+    buildImageDropzone(st, "postImage", () => storyChanged(true), "menimpa pilihan slide di atas"),
+    st.postImage ? "Sedang pakai gambar upload — hapus buat balik ke slide hasil generate." : ""));
+
+  g1.appendChild(labeled("Sumber gambar latar", toggleRow(
+    toggle("bgSame", "Sama dengan postingan", "Pakai gambar sendiri", true)
+  ), "Kalau dimatikan, kamu bisa upload foto lain khusus buat latar belakangnya."));
+  if (!st.bgSame) {
+    g1.appendChild(labeled("Upload gambar latar", buildImageDropzone(st, "bgImage", () => storyChanged(true), "JPG/PNG — dipakai sebagai latar blur")));
+  }
+
+  /* --- 2. Blur & background treatment --- */
+  const g2 = group("2 · Blur & latar belakang", true);
+  g2.appendChild(hint("Ini inti tampilannya: latar sengaja di-blur biar postingan di tengah yang jadi fokus. Naikkan <b>Gelapkan</b> kalau tulisannya kurang kebaca."));
+  g2.appendChild(slider("blur", "Kekuatan blur (px)", 0, 90, 30));
+  g2.appendChild(slider("darken", "Gelapkan latar (%)", 0, 90, 55));
+  g2.appendChild(slider("bgZoom", "Zoom latar (%)", 100, 220, 115));
+  g2.appendChild(slider("bgX", "Geser latar ↔ (%)", 0, 100, 50));
+  g2.appendChild(slider("bgY", "Geser latar ↕ (%)", 0, 100, 50));
+  g2.appendChild(slider("bgSaturate", "Saturasi latar (%)", 0, 200, 105));
+  g2.appendChild(labeled("Efek tambahan", toggleRow(
+    toggle("vignette", "Vignette", "Vignette"),
+    toggle("grain", "Grain", "Grain"),
+    toggle("sparkles", "Garis dekorasi", "Garis dekorasi")
+  ), "Garis dekorasi = coretan kuning/putih di pojok-pojok, biar rame kayak story kreator."));
+
+  /* --- 3. Text --- */
+  const g3 = group("3 · Tulisan", true);
+  g3.appendChild(hint("Highlight: <code>**kata**</code> jadi tulisan kuning, <code>==kata==</code> jadi kotak kuning (kayak stabilo). Sama persis kayak aturan di naskah carousel."));
+  g3.appendChild(text("badge", "Badge atas", "POST BARU!", "Teks pil kuning di atas judul. Kosongkan buat menghilangkannya."));
+
+  // Dynamic wording: the headline follows the featured slide by default, so a story
+  // about a chemistry carousel doesn't inherit the wording of a UTBK-timing one.
+  const srcSlide = storySourceSlide();
+  g3.appendChild(labeled("Sumber tulisan", toggleRow(toggle("autoText", "Ikut isi slide", "Tulis sendiri", true)),
+    st.autoText
+      ? (srcSlide ? "Judul & sub-judul otomatis diambil dari slide yang dipilih di bagian 1 — ganti slide, tulisannya ikut ganti. Matikan kalau mau nulis sendiri."
+        : "Nggak ada slide buat diambil (kamu pakai gambar upload), jadi tulisan di bawah dipakai apa adanya.")
+      : "Kamu nulis sendiri. Nyalakan lagi buat balik ngikut isi slide."));
+
+  const locked = st.autoText && !!srcSlide;
+  g3.appendChild(area("title", "Judul besar", 3, locked
+    ? "Diambil dari judul slide. Matikan “Ikut isi slide” buat ngedit."
+    : "Enter = ganti baris. Bungkus kata penting pakai **…** atau ==…==.", locked));
+  g3.appendChild(slider("titleSize", "Ukuran judul (px)", 48, 130, 82));
+  g3.appendChild(area("subtitle", "Sub-judul", 2, locked
+    ? "Diambil dari sub-judul / topik slide."
+    : "Kalimat pendukung di bawah judul.", locked));
+  g3.appendChild(row(slider("subSize", "Ukuran sub (px)", 20, 52, 32), pick("subIcon", "Ikon sub-judul", STORY_ICONS)));
+  g3.appendChild(row(text("ctaTop", "Ajakan baris 1", "Tap postingan ini"), text("ctaBottom", "Ajakan baris 2 (stabilo)", "untuk penjelasan lengkapnya!")));
+
+  /* --- 4. Style & elements --- */
+  const g4 = group("4 · Gaya & elemen");
+  g4.appendChild(row(pick("font", "Font judul", FONTS), color("accent", "Warna aksen", "#F7B400")));
+  g4.appendChild(row(color("textColor", "Warna teks", "#FFFFFF"), color("accentInk", "Teks di atas aksen", "#101138")));
+  g4.appendChild(text("brandName", "Nama brand (atas)", "Pasti Pintar"));
+  g4.appendChild(labeled("Elemen yang ditampilkan", toggleRow(
+    toggle("showLogo", "Logo", "Logo"),
+    toggle("cardFrame", "Bingkai putih", "Bingkai putih"),
+    toggle("showArrow", "Panah", "Panah"),
+    toggle("showLink", "Ikon link", "Ikon link"),
+    toggle("showHandles", "Handle IG", "Handle IG")
+  )));
+  g4.appendChild(row(slider("cardScale", "Ukuran kartu (%)", 70, 110, 100), slider("cardRotate", "Miringkan kartu (°)", -8, 8, 0)));
+  g4.appendChild(slider("badgeTilt", "Miringkan badge (°)", -6, 6, -1));
+
+  if (isStoryDebugRoute) {
+    /* --- 5. Decoration debug --- */
+    const g5 = group("5 · Debug dekorasi", false);
+    g5.appendChild(hint("Semua nilai langsung mengubah preview Story 1080 x 1920. Nilai <b>X</b>/<b>Y</b> menggeser elemen; skala dan rotasi dipakai untuk penyesuaian visual."));
+    const layoutDebug = (label, prefix, xRange, yRange, scaleMax, rotateRange) => {
+      const block = document.createElement("div");
+      block.className = "story-spark-debug";
+      block.appendChild(labeled(label, row(
+        slider(prefix + "X", "Geser X (px)", xRange[0], xRange[1], 0),
+        slider(prefix + "Y", "Geser Y (px)", yRange[0], yRange[1], 0)
+      )));
+      block.appendChild(row(
+        slider(prefix + "Scale", "Skala (%)", 50, scaleMax || 160, 100),
+        slider(prefix + "Rotate", "Rotasi (derajat)", rotateRange ? rotateRange[0] : -30, rotateRange ? rotateRange[1] : 30, 0)
+      ));
+      return block;
+    };
+    g5.appendChild(row(
+      pick("font", "Font judul", FONTS),
+      slider("titleSize", "Ukuran judul (px)", 48, 130, 82)
+    ));
+    g5.appendChild(slider("subSize", "Ukuran sub-judul (px)", 20, 52, 32));
+    g5.appendChild(layoutDebug("Logo dan nama brand", "debugBrand", [-260, 260], [-180, 180], 180, [-30, 30]));
+    g5.appendChild(row(
+      slider("debugLogoHeight", "Tinggi logo (px)", 40, 180, 96),
+      slider("debugBrandNameSize", "Ukuran nama brand (px)", 20, 72, 44)
+    ));
+    g5.appendChild(pick("debugBrandFont", "Font nama brand", FONTS));
+    g5.appendChild(layoutDebug("Badge POST BARU", "debugBadge", [-240, 240], [-180, 180], 160, [-30, 30]));
+    g5.appendChild(layoutDebug("Judul", "debugTitle", [-240, 240], [-240, 240], 150, [-20, 20]));
+    g5.appendChild(layoutDebug("Sub-judul", "debugSub", [-240, 240], [-200, 200], 150, [-20, 20]));
+    g5.appendChild(layoutDebug("Kartu post", "debugCard", [-180, 180], [-220, 220], 130, [-12, 12]));
+    g5.appendChild(layoutDebug("CTA", "debugCta", [-220, 220], [-180, 180], 150, [-20, 20]));
+    g5.appendChild(layoutDebug("Lingkaran link", "debugLink", [-180, 180], [-180, 180], 180, [-30, 30]));
+    const decorHeading = document.createElement("p");
+    decorHeading.className = "hint"; decorHeading.textContent = "Garis dekorasi";
+    g5.appendChild(decorHeading);
+    const sparkDebug = (label, prefix) => {
+      const block = document.createElement("div");
+      block.className = "story-spark-debug";
+      block.appendChild(labeled("Mode garis", toggleRow(
+        toggle(prefix + "Manual", "Manual", "Otomatis")
+      ), "Otomatis mengikuti elemen terkait. Manual memakai X/Y, rotasi, dan ukuran di bawah."));
+      block.appendChild(labeled(label, row(
+        slider(prefix + "X", "X", 0, 1080, prefix === "sparkBadge" ? 344 : prefix === "sparkLink" ? 937 : 961),
+        slider(prefix + "Y", "Y", 0, 1920, prefix === "sparkBadge" ? 118 : prefix === "sparkLink" ? 1755 : 216)
+      )));
+      block.appendChild(row(
+        slider(prefix + "Rotate", "Rotasi (derajat)", -180, 180, prefix === "sparkBadge" ? -34 : prefix === "sparkLink" ? 61 : 43),
+        slider(prefix + "Size", "Ukuran (px)", 20, 140, prefix === "sparkBadge" ? 86 : prefix === "sparkLink" ? 85 : 75)
+      ));
+      // Editing any coordinate immediately takes this one line out of automatic
+      // placement, so the sliders always move the visible decoration right away.
+      block.addEventListener("input", () => {
+        if (!st[prefix + "Manual"]) {
+          st[prefix + "Manual"] = true;
+          storyChanged();
+        }
+      });
+      return block;
+    };
+    g5.appendChild(labeled("Mode posisi", toggleRow(
+      toggle("sparkManual", "Manual", "Otomatis")
+    ), "Otomatis menempelkan garis ke elemen terkait. Nyalakan Manual bila ingin memakai angka X/Y di bawah."));
+    g5.appendChild(sparkDebug("Garis kuning - badge POST BARU", "sparkBadge"));
+    g5.appendChild(sparkDebug("Garis kuning - lingkaran link", "sparkLink"));
+    const copyDebug = document.createElement("button");
+    copyDebug.type = "button"; copyDebug.className = "btn btn-primary";
+    copyDebug.textContent = "Salin angka debug";
+    copyDebug.addEventListener("click", async () => {
+      const keys = [
+        "font", "titleSize", "subSize",
+        "debugBrandX", "debugBrandY", "debugBrandScale", "debugBrandRotate",
+        "debugLogoHeight", "debugBrandFont", "debugBrandNameSize",
+        "debugBadgeX", "debugBadgeY", "debugBadgeScale", "debugBadgeRotate",
+        "debugTitleX", "debugTitleY", "debugTitleScale", "debugTitleRotate",
+        "debugSubX", "debugSubY", "debugSubScale", "debugSubRotate",
+        "debugCardX", "debugCardY", "debugCardScale", "debugCardRotate",
+        "debugCtaX", "debugCtaY", "debugCtaScale", "debugCtaRotate",
+        "debugLinkX", "debugLinkY", "debugLinkScale", "debugLinkRotate",
+        "sparkManual", "sparkBadgeManual", "sparkLinkManual",
+        "sparkBadgeX", "sparkBadgeY", "sparkBadgeRotate", "sparkBadgeSize",
+        "sparkLinkX", "sparkLinkY", "sparkLinkRotate", "sparkLinkSize",
+      ];
+      const values = {};
+      keys.forEach((key) => { values[key] = key === "font" || key === "debugBrandFont" ? st[key] : typeof st[key] === "boolean" ? st[key] : Number(st[key]); });
+      try {
+        await copyToClipboard(JSON.stringify(values, null, 2));
+        showToast("Angka debug tersalin.");
+      } catch (e) {
+        showToast("Gagal menyalin angka debug.");
+      }
+    });
+    g5.appendChild(copyDebug);
+    const stressTest = document.createElement("button");
+    stressTest.type = "button"; stressTest.className = "btn btn-ghost";
+    stressTest.textContent = "Uji 60 skenario font, judul, dan sub";
+    const stressStatus = document.createElement("p");
+    stressStatus.className = "hint";
+    const stressReport = document.createElement("div");
+    stressReport.className = "story-stress-report";
+    stressTest.addEventListener("click", async () => {
+      const titles = [
+        "JUDUL SINGKAT",
+        "JUDUL DUA BARIS UNTUK STORY",
+        "JUDUL PANJANG YANG TETAP HARUS RAPI DI TENGAH TANPA MENABRAK ASET",
+        "JUDUL TERPANJANG UNTUK MENGUJI KARTU POST MENYUSUT DENGAN AMAN SAAT TEKS BERUBAH",
+      ];
+      const subtitles = [
+        "Sub singkat.",
+        "Subjudul dua baris untuk memberi konteks yang cukup jelas.",
+        "Subjudul panjang untuk menguji apakah ikon, teks pendukung, kartu post, dan CTA tetap memiliki jarak yang rapi tanpa saling bertabrakan.",
+      ];
+      const original = storyData();
+      const failures = [];
+      const results = [];
+      stressTest.disabled = true; stressStatus.textContent = "Menguji 60 kombinasi...";
+      stressReport.innerHTML = "";
+      try {
+        const renderStressStory = async (data) => {
+          window.renderStory(storyExportStage, data);
+          await ensureStoryFonts(storyExportStage);
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+          window.refitStory(storyExportStage);
+          return storyExportStage;
+        };
+        const referenceStory = await renderStressStory(original);
+        const referenceCard = referenceStory.querySelector(".st-card").getBoundingClientRect();
+        const referenceRoot = referenceStory.getBoundingClientRect();
+        const referenceScale = referenceRoot.width / 1080 || 1;
+        const referenceThumbnail = referenceStory.cloneNode(true);
+        referenceThumbnail.removeAttribute("id");
+        referenceThumbnail.style.transform = "scale(0.1)";
+        referenceThumbnail.style.transformOrigin = "top left";
+        results.push({
+          font: "Acuan aktif",
+          title: original.title || "-",
+          subtitle: original.subtitle || "-",
+          cardHeight: Math.round(referenceCard.height / referenceScale),
+          problems: [],
+          thumbnail: referenceThumbnail,
+          reference: true,
+        });
+        for (const fontOption of FONTS) {
+          try { await document.fonts.load(`400 ${st.titleSize || 82}px "${fontOption.id}"`); } catch (e) { /* fallback metrics are tested too */ }
+          for (const titleValue of titles) {
+            for (const subtitleValue of subtitles) {
+              const testData = Object.assign({}, original, {
+                font: fontOption.id, title: titleValue, subtitle: subtitleValue, autoText: false,
+              });
+              const testStory = await renderStressStory(testData);
+              const rootRect = testStory.getBoundingClientRect();
+              const scale = rootRect.width / 1080 || 1;
+              const local = (selector, index) => {
+                const node = testStory.querySelectorAll(selector)[index || 0];
+                const rect = node.getBoundingClientRect();
+                return { left: (rect.left - rootRect.left) / scale, top: (rect.top - rootRect.top) / scale, right: (rect.right - rootRect.left) / scale, bottom: (rect.bottom - rootRect.top) / scale };
+              };
+              const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+              const sparks = [0, 1, 2].map((index) => local(".st-spark", index));
+              const titleBox = local(".st-title");
+              const subBox = local(".st-sub");
+              const badgeBox = local(".st-badge");
+              const linkBox = local(".st-linkchip");
+              const innerBox = local(".st-inner");
+              const problems = [];
+              if (overlaps(sparks[0], badgeBox)) problems.push("garis badge");
+              if (overlaps(sparks[1], linkBox)) problems.push("garis link");
+              if (innerBox.bottom > 1920.5) problems.push("keluar kanvas");
+              const cardBox = local(".st-card");
+              const thumbnail = testStory.cloneNode(true);
+              thumbnail.removeAttribute("id");
+              thumbnail.style.transform = "scale(0.1)";
+              thumbnail.style.transformOrigin = "top left";
+              results.push({ font: fontOption.id, title: titleValue, subtitle: subtitleValue, cardHeight: Math.round(cardBox.bottom - cardBox.top), problems, thumbnail });
+              if (problems.length) failures.push(fontOption.id + ": " + titleValue.slice(0, 18) + " / " + subtitleValue.slice(0, 18));
+            }
+          }
+        }
+        const table = document.createElement("table");
+        table.innerHTML = "<thead><tr><th>Preview</th><th>Font</th><th>Judul uji</th><th>Subjudul uji</th><th>Kartu</th><th>Status</th></tr></thead>";
+        const body = document.createElement("tbody");
+        results.forEach((item) => {
+          const rowEl = document.createElement("tr");
+          rowEl.className = item.problems.length ? "fail" : "pass";
+          if (item.reference) rowEl.classList.add("reference");
+          const previewCell = document.createElement("td");
+          const preview = document.createElement("div");
+          preview.className = "story-stress-thumb";
+          preview.appendChild(item.thumbnail);
+          previewCell.appendChild(preview);
+          const status = item.reference ? "Sama dengan preview utama" : item.problems.length ? `Perlu cek: ${item.problems.join(", ")}` : "Aman";
+          [item.font, item.title, item.subtitle, item.cardHeight + "px", status].forEach((value) => {
+            const cell = document.createElement("td"); cell.textContent = value; rowEl.appendChild(cell);
+          });
+          rowEl.insertBefore(previewCell, rowEl.firstChild);
+          body.appendChild(rowEl);
+        });
+        table.appendChild(body);
+        stressReport.replaceChildren(table);
+        stressStatus.textContent = failures.length
+          ? `Ditemukan ${failures.length} skenario perlu dicek: ${failures.join(" | ")}`
+          : "Lulus: 60 skenario font, judul, dan subjudul aman pada ukuran font saat ini.";
+      } finally {
+        window.renderStory(storyExportStage, original);
+        window.renderStory(storyPreview, original);
+        scaleStoryPreview();
+        stressTest.disabled = false;
+      }
+    });
+    g5.appendChild(stressTest);
+    g5.appendChild(stressStatus);
+    g5.appendChild(stressReport);
+  }
+
+  storyBuilding = false;
+  updateStoryPreview();
+}
+
+/* Rasterize the hidden 1080x1920 story stage. Mirrors stageToPng's resilience: retry
+ * once without font embedding rather than hard-failing the export. */
+async function storyToPng() {
+  const fontEmbedCSS = await getFontEmbedCSS();
+  const opts = { width: 1080, height: 1920, pixelRatio: 1, cacheBust: true };
+  if (fontEmbedCSS) opts.fontEmbedCSS = fontEmbedCSS;
+  try {
+    return await window.htmlToImage.toPng(storyExportStage, opts);
+  } catch (e) {
+    return await window.htmlToImage.toPng(storyExportStage, Object.assign({}, opts, { skipFonts: true }));
+  }
+}
+async function ensureStoryFonts(root) {
+  const wanted = new Set();
+  root.querySelectorAll(".st-title,.st-badge,.st-sub-tx,.st-cta-1,.st-cta-2,.st-brandname,.st-h").forEach((n) => {
+    const cs = getComputedStyle(n);
+    const fam = cs.fontFamily.split(",")[0].replace(/['"]/g, "").trim();
+    if (fam) wanted.add(`${cs.fontWeight} 32px "${fam}"`);
+  });
+  try { await Promise.all([...wanted].map((f) => document.fonts.load(f))); } catch (e) { /* fall through */ }
+  await document.fonts.ready;
+}
+async function downloadStory() {
+  const data = storyData();
+  if (!data.postImage) {
+    storyStatus.textContent = "Belum ada gambar postingan — klik Generate PNG dulu, atau upload gambar di bagian 1.";
+    storyStatus.className = "status-msg error";
+    return;
+  }
+  storyDownloadBtn.disabled = true;
+  storyStatus.className = "status-msg";
+  storyStatus.textContent = "Merender story 1080×1920…";
+  try {
+    window.renderStory(storyExportStage, data);
+    await waitImages(storyExportStage);
+    await ensureStoryFonts(storyExportStage);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    window.refitStory(storyExportStage); // re-fit now that the real fonts are loaded
+    const png = await storyToPng();
+    const blob = await (await fetch(png)).blob();
+    downloadBlob(blob, "story-instagram.png");
+    storyStatus.textContent = "Selesai! story-instagram.png (1080×1920) siap di-upload ke Instagram Story.";
+    storyStatus.className = "status-msg ok";
+  } catch (err) {
+    storyStatus.textContent = "Error bikin story: " + err.message;
+    storyStatus.className = "status-msg error";
+    console.error(err);
+  } finally { storyDownloadBtn.disabled = false; }
+}
+storyDownloadBtn.addEventListener("click", downloadStory);
+document.getElementById("storyResetBtn").addEventListener("click", () => {
+  if (!confirm("Kembalikan semua pengaturan story ke setelan awal?")) return;
+  state.story = defaultStory();
+  renderStoryEditor();
+  markDirty();
 });
 
 /* ---------------- Export: PPTX (editable, layered — Canva-first) ----------------
@@ -3114,5 +3698,6 @@ downloadPptxBtn.addEventListener("click", async () => {
   }
   updateSaveBadge();
   // Console/debug handle (also used by the automated tests).
-  window.__cs = { state, current, renderSlides, refreshAll, autosaveNow, manualSave, rebuildCard };
+  window.__cs = { state, current, renderSlides, refreshAll, autosaveNow, manualSave, rebuildCard,
+    renderStoryEditor, storyData, downloadStory, generatePng };
 })();

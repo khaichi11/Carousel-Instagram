@@ -12,6 +12,15 @@ Output bisa **PNG** (siap upload) atau **PPTX** (semua elemen editable di Canva/
 - **Customisasi Mendalam**: posisi teks, warna, texture (bisa digeser & di-scale), pattern, dan background gambar (pan/crop).
 - **Custom Font**: Bisa paste link dari Google Fonts langsung di web.
 - **Export PPTX Native**: Elemen seperti text, background, dan kotak-kotak bisa dipindah/diedit terpisah di Canva.
+- **Story Instagram (9:16)**: bikin background story buat promosiin postingan yang baru
+  di-upload. Gambar postingannya dipakai dua kali — jadi **latar yang di-blur** (blur,
+  gelap, zoom & posisinya bisa diatur) dan jadi **kartu berbingkai di tengah**.
+  Di atasnya ada badge "POST BARU!", judul besar (`**kata**` = tulisan kuning,
+  `==kata==` = kotak stabilo), sub-judul berikon, panah melengkung + ajakan
+  "Tap postingan ini", ikon link, logo, dan coretan dekorasi di pojok-pojok. Warna
+  aksen, font, ukuran/kemiringan kartu, dan tiap elemen bisa dimatikan satu-satu.
+  Output **PNG 1080×1920** siap upload. Semua ornamennya SVG yang digambar sendiri —
+  nol aset pihak ketiga, jadi bebas copyright (detail di `docs/LICENSES/CREDITS.md`).
 - **Import Brief (PDF/TXT/MD)**: slide kebentuk otomatis — komparasi (`kiri:`/`kanan:` atau dua judul kolom diakhiri `:`) dan meme (`captop:`/`capbawah:`) terdeteksi sendiri. Aturan lengkap tiap field (topik, eyebrow, judul, dst.) ada di tombol **"Lihat contoh format"** di web; PDF harus PDF teks (bukan scan).
 
 ## Coba lokal
@@ -21,6 +30,12 @@ Butuh Node cuma buat server file statis (biar font & modul kebaca lewat http):
 npm start
 ```
 Lalu buka **http://localhost:4173**. (Alternatif tanpa Node: `python3 -m http.server -d docs 4173`.)
+
+Untuk menata posisi coretan Story secara presisi, buka **http://localhost:4173/debug**.
+Halaman ini memakai editor yang sama, tetapi menampilkan panel **Debug dekorasi** untuk
+mengatur X, Y, rotasi, dan ukuran tiga garis kuning/putih, lalu menyalin nilainya sebagai
+JSON. Rute ini adalah pemisahan UI untuk pengguna teknis, bukan mekanisme keamanan atau
+autentikasi.
 
 ## Cara bikin file buat di-import
 

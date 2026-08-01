@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="fonts.css" />
 <link rel="stylesheet" href="stage.css?v=28" />
 <link rel="stylesheet" href="style.css?v=30" />
+<link rel="stylesheet" href="story.css?v=1" />
 </head>
 <body class="stage-scope">
 
@@ -220,11 +221,40 @@
     <div class="gallery" id="gallery"></div>
   </section>
 
+  <section class="panel" id="storySection">
+    <div class="slides-head">
+      <div>
+        <h2>Story Instagram (9:16)</h2>
+        <p class="hint">Bikin background story buat promosiin postingan: <b>gambar postingannya sendiri di-blur</b> jadi latar (blur bisa diatur), postingannya ditempel di tengah, plus badge "POST BARU!", judul menarik, garis-garis dekorasi, panah, ikon link &amp; logo. Semua elemen digambar sendiri pakai SVG + font bawaan (SIL OFL) — <b>bebas copyright</b>.</p>
+      </div>
+      <div class="chip-row">
+        <button class="btn btn-ghost" id="storyResetBtn">Reset Story</button>
+      </div>
+    </div>
+
+    <div class="story-layout">
+      <div class="story-controls" id="storyControls"></div>
+      <aside class="story-preview">
+        <div class="story-preview-frame" id="storyPreviewFrame"><div class="story" id="storyPreview"></div></div>
+        <div class="chip-row">
+          <button type="button" class="btn btn-primary" id="storyDownloadBtn">Download Story PNG</button>
+        </div>
+        <span class="preview-cap">Live preview 1080 × 1920 — persis seperti hasil PNG-nya</span>
+      </aside>
+    </div>
+    <p class="status-msg" id="storyStatus"></p>
+  </section>
+
 </main>
 
 <!-- hidden full-size stage used for PNG export -->
 <div id="exportHost" aria-hidden="true" style="position:fixed; left:-99999px; top:0; width:1080px; height:1350px;">
   <div class="stage" id="exportStage"></div>
+</div>
+
+<!-- hidden full-size story stage (1080x1920) used for story PNG export -->
+<div id="storyExportHost" aria-hidden="true" style="position:fixed; left:-99999px; top:0; width:1080px; height:1920px;">
+  <div class="story" id="storyExportStage"></div>
 </div>
 
 <!-- GPT Prompt Generator modal -->
@@ -376,9 +406,10 @@
 
 <script src="textures.js?v=14"></script>
 <script src="stage.js?v=28"></script>
+<script src="story.js?v=1"></script>
 <script src="vendor/html-to-image.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
-<script type="module" src="app.js?v=39"></script>
+<script type="module" src="app.js?v=40"></script>
 </body>
 </html>

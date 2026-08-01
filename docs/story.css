@@ -1,0 +1,194 @@
+/* ============ Instagram Story design (1080x1920) + its editor panel ============
+ * Rendered by story.js and rasterized through the same html-to-image pipeline as
+ * the carousel slides, so everything here must be self-contained CSS — no external
+ * fonts, images or icon sets. */
+
+.story, .story * { margin: 0; padding: 0; box-sizing: border-box; }
+
+.story {
+  position: relative;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #0B0C22;
+  color: #fff;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --acc: #F7B400;
+  --acc-ink: #101138;
+  --st-font: "Anton", Impact, sans-serif;
+}
+
+/* ---------- Background stack ---------- */
+.story .st-bg { position: absolute; inset: 0; overflow: hidden; }
+.story .st-bg-img { width: 100%; height: 100%; object-fit: cover; display: block; transform-origin: center; }
+.story .st-scrim { position: absolute; inset: 0; }
+.story .st-vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 78% 62% at 50% 46%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 100%);
+}
+.story .st-grain {
+  position: absolute; inset: 0; opacity: 0.13; mix-blend-mode: overlay; pointer-events: none;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(255,255,255,0.2) 0 1px, transparent 1.3px),
+    radial-gradient(circle at 70% 35%, rgba(255,255,255,0.16) 0 1px, transparent 1.2px),
+    radial-gradient(circle at 35% 80%, rgba(255,255,255,0.14) 0 1px, transparent 1.4px);
+  background-size: 13px 13px, 16px 16px, 19px 19px;
+}
+
+/* ---------- Decorative sparkles ----------
+   Positioned relative to the badge / title / CTA rows they decorate (see story.js),
+   so they follow the text instead of floating at fixed canvas coordinates. */
+/* Kept small and semi-transparent: these are meant to frame the words, not pull the
+   eye off them. z-index sits below .st-inner so a mark can never cover a letter. */
+.story .st-spark { position: absolute; color: #fff; opacity: 0.62; pointer-events: none; z-index: 2; }
+.story .st-spark.acc { color: var(--acc); opacity: 0.85; }
+.story .st-spark svg { width: 100%; height: 100%; display: block; }
+
+/* ---------- Content column ---------- */
+.story .st-inner {
+  position: absolute; inset: 0;
+  padding: 64px 62px 56px;
+  display: flex; flex-direction: column; align-items: center;
+  row-gap: 28px;
+  text-align: center;
+  z-index: 3;
+}
+
+.story .st-brand { display: flex; align-items: center; gap: 14px; }
+.story .st-logo { height: 96px; width: auto; display: block; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.32)); }
+.story .st-brandname { font-size: 44px; font-weight: 800; letter-spacing: -0.4px; text-shadow: 0 3px 10px rgba(0,0,0,0.32); }
+
+.story .st-badge-row {
+  display: flex; justify-content: center; width: 100%;
+  margin-top: 0; padding-left: 0;
+}
+
+.story .st-badge {
+  background: var(--acc); color: var(--acc-ink);
+  font-family: var(--st-font); font-size: 46px; line-height: 1;
+  letter-spacing: 2.5px; text-transform: uppercase;
+  padding: 18px 40px 14px; border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.story .st-title {
+  font-family: var(--st-font);
+  font-weight: 400; line-height: 0.98; text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 0 6px 26px rgba(0,0,0,0.5);
+  width: calc(100% - var(--st-title-right-clearance, 0px));
+  max-width: 100%;
+  margin-right: 0;
+}
+.story .st-acc { color: var(--acc); }
+/* Filled emphasis block — the yellow box behind a phrase. Inline-block with a small
+   negative vertical margin so a boxed word doesn't add extra line height. */
+.story .st-hl {
+  background: var(--acc); color: var(--acc-ink);
+  padding: 0.06em 0.22em 0.02em; border-radius: 8px;
+  display: inline-block; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  text-shadow: none;
+}
+
+.story .st-sub { display: flex; align-items: center; justify-content: center; gap: 20px; max-width: 92%; }
+.story .st-sub-ic {
+  flex: 0 0 auto; width: 74px; height: 74px; border-radius: 50%;
+  border: 4px solid var(--acc); color: var(--acc);
+  display: flex; align-items: center; justify-content: center;
+}
+.story .st-sub-ic svg { width: 42px; height: 42px; }
+.story .st-sub-tx { text-align: left; font-weight: 600; line-height: 1.28; text-shadow: 0 3px 14px rgba(0,0,0,0.5); }
+.story .st-sub-tx .st-hl { padding: 0 0.16em; border-radius: 5px; }
+
+/* The framed post. flex:1 + min-height:0 makes it the element that gives up space
+   when the headline is long, so the story never overflows its 1920px canvas. */
+.story .st-card {
+  flex: 0 1 1137px; min-height: 0; width: 100%; margin-top: auto;
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px; border-radius: 30px;
+  border: 5px solid rgba(255,255,255,0.92);
+  box-shadow: 0 30px 70px rgba(0,0,0,0.5);
+  background: rgba(255,255,255,0.06);
+}
+.story .st-card.bare { border: none; padding: 0; background: none; }
+.story .st-card-img {
+  max-width: 100%; max-height: 100%; width: auto; height: auto;
+  object-fit: contain; border-radius: 20px; display: block;
+}
+.story .st-card.bare .st-card-img { border-radius: 26px; }
+.story .st-card-empty { font-size: 30px; font-weight: 700; color: rgba(255,255,255,0.65); line-height: 1.5; }
+
+.story .st-cta {
+  display: flex; align-items: center; justify-content: center; gap: 28px; width: 100%;
+  padding-right: 0;
+}
+/* 84x105 matches the arrow's 120x150 viewBox aspect exactly, so the loop stays round. */
+.story .st-arrow { flex: 0 0 auto; width: 84px; height: 105px; color: #fff; opacity: 0.95; }
+.story .st-arrow svg { width: 100%; height: 100%; display: block; }
+.story .st-cta-tx { text-align: left; }
+.story .st-cta-1 { font-size: 40px; font-weight: 800; line-height: 1.15; text-shadow: 0 3px 14px rgba(0,0,0,0.5); }
+.story .st-cta-2 { font-size: 40px; font-weight: 800; line-height: 1.15; margin-top: 6px; }
+.story .st-cta-2 .st-hl { padding: 4px 13px; border-radius: 7px; box-shadow: 0 4px 12px rgba(247,180,0,0.3); }
+.story .st-linkchip {
+  flex: 0 0 auto; width: 90px; height: 90px; border-radius: 50%;
+  background: #fff; color: var(--acc-ink);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.38);
+}
+.story .st-linkchip svg { width: 50px; height: 50px; }
+
+.story .st-handles { display: flex; align-items: center; justify-content: center; gap: 34px; font-size: 26px; font-weight: 700; opacity: 0.9; }
+.story .st-h { display: inline-flex; align-items: center; gap: 10px; }
+.story .st-hic { width: 32px; height: 32px; display: inline-flex; color: var(--acc); }
+.story .st-hic svg { width: 100%; height: 100%; }
+
+/* ================= Editor panel (app chrome, not exported) ================= */
+.story-layout { display: grid; grid-template-columns: 1fr 330px; gap: 22px; align-items: start; }
+@media (max-width: 1080px) { .story-layout { grid-template-columns: 1fr; } }
+
+.story-controls { display: grid; gap: 14px; }
+.story-controls .field { margin: 0; }
+.story-controls .opt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.story-spark-debug { display: grid; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border); }
+.story-spark-debug + .story-spark-debug { margin-top: 6px; }
+.story-stress-report { overflow-x: auto; font-size: 12px; line-height: 1.35; }
+.story-stress-report table { width: 100%; border-collapse: collapse; min-width: 980px; }
+.story-stress-report th, .story-stress-report td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.story-stress-report th { color: var(--text-soft); font-size: 11px; text-transform: uppercase; }
+.story-stress-report tr.pass td:last-child { color: #23734D; font-weight: 800; }
+.story-stress-report tr.fail td:last-child { color: #B33B3B; font-weight: 800; }
+.story-stress-report tr.reference { background: rgba(247,180,0,0.12); }
+.story-stress-report tr.reference td:last-child { color: #8A6200; font-weight: 800; }
+.story-stress-thumb { width: 108px; height: 192px; overflow: hidden; position: relative; border: 1px solid var(--border); background: #0B0C22; }
+.story-stress-thumb .story { position: absolute; left: 0; top: 0; }
+
+/* Live preview: the real 1080x1920 story scaled down with a transform, so what you
+   see is pixel-identical to the exported PNG (no separate preview markup). */
+.story-preview { position: sticky; top: 96px; }
+.story-preview-frame {
+  width: 100%; aspect-ratio: 1080 / 1920;
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--border); background: #0B0C22;
+  box-shadow: 0 12px 34px rgba(33,35,102,0.14);
+  position: relative;
+}
+.story-preview-frame .story {
+  position: absolute; top: 0; left: 0;
+  transform-origin: top left;
+}
+.story-preview .preview-cap { display: block; text-align: center; font-size: 12px; color: var(--text-soft); margin-top: 8px; }
+.story-preview .chip-row { justify-content: center; margin-top: 8px; }
+
+.story-src-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.story-src-thumb {
+  width: 62px; border: 2px solid var(--border); border-radius: 8px; overflow: hidden;
+  cursor: pointer; background: #fff; padding: 0; line-height: 0; position: relative;
+}
+.story-src-thumb img { width: 100%; display: block; }
+.story-src-thumb.active { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(247,180,0,0.25); }
+.story-src-thumb span {
+  position: absolute; left: 3px; top: 3px; background: rgba(16,17,56,0.8); color: #fff;
+  font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px; line-height: 1.4;
+}
+.story-empty { font-size: 13px; color: var(--text-soft); background: #F7F8FE; border: 1px dashed var(--border); border-radius: 10px; padding: 12px 14px; }
