@@ -223,6 +223,9 @@ function defaultStory() {
     debugSubX: 0, debugSubY: 76, debugSubScale: 100, debugSubRotate: 0,
     debugCardX: 0, debugCardY: 20, debugCardScale: 87, debugCardRotate: 0,
     debugCtaX: 0, debugCtaY: -18, debugCtaScale: 100, debugCtaRotate: 0,
+    debugArrowX: 2, debugArrowY: -1, debugArrowScale: 120, debugArrowRotate: 0,
+    debugArrowHeadX: 19, debugArrowHeadY: -14, debugArrowHeadRotate: -12,
+    debugArrowTailX: -6, debugArrowTailY: -8, debugArrowTailRotate: 4,
     debugLinkX: 0, debugLinkY: 0, debugLinkScale: 100, debugLinkRotate: 0,
   };
 }
@@ -2891,6 +2894,23 @@ function renderStoryEditor() {
     g5.appendChild(layoutDebug("Sub-judul", "debugSub", [-240, 240], [-200, 200], 150, [-20, 20]));
     g5.appendChild(layoutDebug("Kartu post", "debugCard", [-180, 180], [-220, 220], 130, [-12, 12]));
     g5.appendChild(layoutDebug("CTA", "debugCta", [-220, 220], [-180, 180], 150, [-20, 20]));
+    g5.appendChild(layoutDebug("Panah CTA", "debugArrow", [-180, 180], [-180, 180], 180, [-180, 180]));
+    const arrowHead = document.createElement("div");
+    arrowHead.className = "story-spark-debug";
+    arrowHead.appendChild(labeled("Ujung panah", row(
+      slider("debugArrowHeadX", "Geser X (px)", -360, 360, 0),
+      slider("debugArrowHeadY", "Geser Y (px)", -360, 360, 0)
+    )));
+    arrowHead.appendChild(slider("debugArrowHeadRotate", "Rotasi ujung (derajat)", -180, 180, 0));
+    g5.appendChild(arrowHead);
+    const arrowTail = document.createElement("div");
+    arrowTail.className = "story-spark-debug";
+    arrowTail.appendChild(labeled("Pangkal panah", row(
+      slider("debugArrowTailX", "Geser X (px)", -360, 360, 0),
+      slider("debugArrowTailY", "Geser Y (px)", -360, 360, 0)
+    )));
+    arrowTail.appendChild(slider("debugArrowTailRotate", "Rotasi pangkal (derajat)", -180, 180, 0));
+    g5.appendChild(arrowTail);
     g5.appendChild(layoutDebug("Lingkaran link", "debugLink", [-180, 180], [-180, 180], 180, [-30, 30]));
     const decorHeading = document.createElement("p");
     decorHeading.className = "hint"; decorHeading.textContent = "Garis dekorasi";
@@ -2937,6 +2957,9 @@ function renderStoryEditor() {
         "debugSubX", "debugSubY", "debugSubScale", "debugSubRotate",
         "debugCardX", "debugCardY", "debugCardScale", "debugCardRotate",
         "debugCtaX", "debugCtaY", "debugCtaScale", "debugCtaRotate",
+        "debugArrowX", "debugArrowY", "debugArrowScale", "debugArrowRotate",
+        "debugArrowHeadX", "debugArrowHeadY", "debugArrowHeadRotate",
+        "debugArrowTailX", "debugArrowTailY", "debugArrowTailRotate",
         "debugLinkX", "debugLinkY", "debugLinkScale", "debugLinkRotate",
         "sparkManual", "sparkBadgeManual", "sparkLinkManual",
         "sparkBadgeX", "sparkBadgeY", "sparkBadgeRotate", "sparkBadgeSize",

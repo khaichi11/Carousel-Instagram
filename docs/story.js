@@ -63,10 +63,35 @@
   /* CTA arrow: an upright shaft that bows slightly left, curves right at the foot into
    * a short tail, and finishes in a two-barb head aimed up at the post card. Drawn from
    * scratch as two cubic segments plus the barbs — no traced or imported artwork. */
-  var SVG_ARROW =
-    '<svg viewBox="0 0 64 80" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M62 74C46 78 29 74 22 61 16 50 15 30 21 4"/>' +
-    '<path d="M21 4L1 22"/><path d="M21 4L30 25"/></svg>';
+  function arrowSvg(d) {
+    var headX = 21 + Number(d.debugArrowHeadX || 0);
+    var headY = 4 + Number(d.debugArrowHeadY || 0);
+    var headRotate = Number(d.debugArrowHeadRotate || 0);
+    var tailX = 62 + Number(d.debugArrowTailX || 0);
+    var tailY = 74 + Number(d.debugArrowTailY || 0);
+    var tailRotate = Number(d.debugArrowTailRotate || 0);
+    var radians = headRotate * Math.PI / 180;
+    // Rotate the shaft's incoming tangent with the head so the curve always
+    // points into the arrowhead instead of merely ending at the same position.
+    var tangentX = 6 * Math.cos(radians) - (-26) * Math.sin(radians);
+    var tangentY = 6 * Math.sin(radians) + (-26) * Math.cos(radians);
+    var tangentLength = Math.sqrt(tangentX * tangentX + tangentY * tangentY) || 1;
+    var distance = Math.sqrt((headX - tailX) * (headX - tailX) + (headY - tailY) * (headY - tailY));
+    var approachLength = Math.max(28, Math.min(70, distance * 0.42));
+    var controlX = headX - tangentX / tangentLength * approachLength;
+    var controlY = headY - tangentY / tangentLength * approachLength;
+    var tailRadians = tailRotate * Math.PI / 180;
+    var tailTangentX = -20 * Math.cos(tailRadians) - 8 * Math.sin(tailRadians);
+    var tailTangentY = -20 * Math.sin(tailRadians) + 8 * Math.cos(tailRadians);
+    var tailLength = Math.max(20, Math.min(60, distance * 0.3));
+    var tailBaseLength = Math.sqrt(tailTangentX * tailTangentX + tailTangentY * tailTangentY) || 1;
+    var tailControlX = tailX + tailTangentX / tailBaseLength * tailLength;
+    var tailControlY = tailY + tailTangentY / tailBaseLength * tailLength;
+    return '<svg viewBox="0 0 64 80" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path class="st-arrow-body" d="M' + tailX + ' ' + tailY + 'C' + tailControlX + ' ' + tailControlY + ' ' + controlX + ' ' + controlY + ' ' + headX + ' ' + headY + '"/>' +
+      '<g class="st-arrow-head" transform="translate(' + headX + ' ' + headY + ') rotate(' + headRotate + ')">' +
+      '<path d="M0 0L-20 18"/><path d="M0 0L11 24.556"/></g></svg>';
+  }
 
   /* Sparkle mark — ALWAYS three radiating dashes ("garis 3"). There is deliberately no
    * two-dash variant: a pair reads as a stray mark rather than an intentional accent.
@@ -118,12 +143,12 @@
         add(true, 62, b.x - 76, b.y - 42, -34);
       }
     }
-    if (linkManual) {
+    if (d.showLink !== false && linkManual) {
       // A handle adds one footer row, so keep the manually tuned link mark beside
       // the CTA instead of leaving it beneath the new footer content.
       var handleOffset = d.igHandle ? 60 : 0;
       add(true, d.sparkLinkSize || 85, d.sparkLinkX == null ? 937 : d.sparkLinkX, (d.sparkLinkY == null ? 1755 : d.sparkLinkY) - handleOffset, d.sparkLinkRotate == null ? 61 : d.sparkLinkRotate);
-    } else {
+    } else if (d.showLink !== false) {
       var link = root.querySelector(".st-linkchip");
       if (link) {
         var l = localRect(root, link);
@@ -256,7 +281,11 @@
 
     /* Footer CTA: hooked arrow + two-line call to action + link chip */
     var cta = el("div", "st-cta");
-    if (d.showArrow !== false) cta.appendChild(el("div", "st-arrow", SVG_ARROW));
+    if (d.showArrow !== false) {
+      var arrow = el("div", "st-arrow", arrowSvg(d));
+      applyDebugTransform(arrow, d, "debugArrow");
+      cta.appendChild(arrow);
+    }
     var tx = el("div", "st-cta-tx");
     if (d.ctaTop) tx.appendChild(el("div", "st-cta-1", inline(d.ctaTop)));
     if (d.ctaBottom) tx.appendChild(el("div", "st-cta-2", '<span class="st-hl">' + esc(d.ctaBottom) + "</span>"));
