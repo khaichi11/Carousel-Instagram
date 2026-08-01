@@ -58,8 +58,8 @@
   var SVG_LINK = SUB_ICONS.link;
   var SVG_IG = svg24('<rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5"/><circle cx="12" cy="12" r="4.5"/>' +
     '<circle cx="17.2" cy="6.8" r="1.3" fill="currentColor" stroke="none"/>');
-  var SVG_PLAY = svg24('<rect x="2" y="5" width="20" height="14" rx="4.5"/>' +
-    '<path d="M10.2 9.3l4.6 2.7-4.6 2.7z" fill="currentColor" stroke="none"/>');
+  var SVG_WEB = svg24('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21"/>' +
+    '<path d="M12 3C9.5 5.5 8.2 8.5 8.2 12S9.5 18.5 12 21"/>');
   /* CTA arrow: an upright shaft that bows slightly left, curves right at the foot into
    * a short tail, and finishes in a two-barb head aimed up at the post card. Drawn from
    * scratch as two cubic segments plus the barbs — no traced or imported artwork. */
@@ -119,7 +119,10 @@
       }
     }
     if (linkManual) {
-      add(true, d.sparkLinkSize || 85, d.sparkLinkX == null ? 937 : d.sparkLinkX, d.sparkLinkY == null ? 1755 : d.sparkLinkY, d.sparkLinkRotate == null ? 61 : d.sparkLinkRotate);
+      // A handle adds one footer row, so keep the manually tuned link mark beside
+      // the CTA instead of leaving it beneath the new footer content.
+      var handleOffset = d.igHandle ? 60 : 0;
+      add(true, d.sparkLinkSize || 85, d.sparkLinkX == null ? 937 : d.sparkLinkX, (d.sparkLinkY == null ? 1755 : d.sparkLinkY) - handleOffset, d.sparkLinkRotate == null ? 61 : d.sparkLinkRotate);
     } else {
       var link = root.querySelector(".st-linkchip");
       if (link) {
@@ -270,7 +273,7 @@
     if (d.igHandle || d.website) {
       var hs = el("div", "st-handles");
       if (d.igHandle) hs.appendChild(el("span", "st-h", '<span class="st-hic">' + SVG_IG + "</span>" + esc(d.igHandle)));
-      if (d.website) hs.appendChild(el("span", "st-h", '<span class="st-hic">' + SVG_PLAY + "</span>" + esc(d.website)));
+      if (d.website) hs.appendChild(el("span", "st-h", '<span class="st-hic">' + SVG_WEB + "</span>" + esc(d.website)));
       inner.appendChild(hs);
     }
 
