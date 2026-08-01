@@ -135,7 +135,19 @@
     var badgeManual = d.sparkManual || d.sparkBadgeManual;
     var linkManual = d.sparkManual || d.sparkLinkManual;
     if (badgeManual) {
-      add(true, d.sparkBadgeSize || 86, d.sparkBadgeX == null ? 344 : d.sparkBadgeX, d.sparkBadgeY == null ? 118 : d.sparkBadgeY, d.sparkBadgeRotate == null ? -34 : d.sparkBadgeRotate);
+      var badgeX = d.sparkBadgeX == null ? 344 : d.sparkBadgeX;
+      var badgeY = d.sparkBadgeY == null ? 118 : d.sparkBadgeY;
+      if (d.showLogo === false) {
+        var hiddenLogoBadge = root.querySelector(".st-badge");
+        if (hiddenLogoBadge) {
+          var hiddenLogoBadgeRect = localRect(root, hiddenLogoBadge);
+          // These are the default canvas coordinates of the tuned badge. Apply
+          // only the layout delta, preserving the user's manual line offset.
+          badgeX += hiddenLogoBadgeRect.x - 391.0625;
+          badgeY += hiddenLogoBadgeRect.y - 236;
+        }
+      }
+      add(true, d.sparkBadgeSize || 86, badgeX, badgeY, d.sparkBadgeRotate == null ? -34 : d.sparkBadgeRotate);
     } else {
       var badge = root.querySelector(".st-badge");
       if (badge) {
@@ -147,7 +159,14 @@
       // A handle adds one footer row, so keep the manually tuned link mark beside
       // the CTA instead of leaving it beneath the new footer content.
       var handleOffset = d.igHandle ? 60 : 0;
-      add(true, d.sparkLinkSize || 85, d.sparkLinkX == null ? 937 : d.sparkLinkX, (d.sparkLinkY == null ? 1755 : d.sparkLinkY) - handleOffset, d.sparkLinkRotate == null ? 61 : d.sparkLinkRotate);
+      var linkX = d.sparkLinkX == null ? 937 : d.sparkLinkX;
+      var linkY = (d.sparkLinkY == null ? 1755 : d.sparkLinkY) - handleOffset;
+      if (d.showArrow === false) {
+        // Removing the 84px arrow plus its 28px gap re-centers the CTA group
+        // by half that width, moving the link and its decoration 56px left.
+        linkX -= 56;
+      }
+      add(true, d.sparkLinkSize || 85, linkX, linkY, d.sparkLinkRotate == null ? 61 : d.sparkLinkRotate);
     } else if (d.showLink !== false) {
       var link = root.querySelector(".st-linkchip");
       if (link) {

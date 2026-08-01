@@ -2613,7 +2613,8 @@ const storyPreviewFrame = document.getElementById("storyPreviewFrame");
 const storyStatus = document.getElementById("storyStatus");
 const storyExportStage = document.getElementById("storyExportStage");
 const storyDownloadBtn = document.getElementById("storyDownloadBtn");
-const isStoryDebugRoute = window.location.pathname.replace(/\/+$/, "") === "/debug";
+const isStoryDebugRoute = window.location.pathname.replace(/\/+$/, "") === "/debug" ||
+  new URLSearchParams(window.location.search).get("debug") === "1";
 
 const STORY_ICONS = [
   { id: "auto", label: "Otomatis (ikut isi slide)" },
