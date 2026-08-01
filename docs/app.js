@@ -189,7 +189,7 @@ function defaultStory() {
     srcIndex: 0,        // which generated PNG is featured (ignored once postImage is set)
     postImage: null,    // uploaded override for the card
     showPost: false,    // generated slides only appear as a post when explicitly enabled
-    bgSame: false,      // background is independent from the post by default
+    useGlobalBg: true,  // use the same raw global background as the carousel slides
     bgImage: null,      // uploaded override for the background
     blur: 30, darken: 48, bgZoom: 115, bgX: 50, bgY: 50, bgSaturate: 105,
     vignette: true, grain: true, sparkles: true,
@@ -2688,7 +2688,7 @@ function storyData() {
   syncStoryText();
   const st = state.story;
   const post = storyPostSrc();
-  const background = st.bgSame ? post : st.bgImage;
+  const background = st.useGlobalBg !== false ? state.bgImage : st.bgImage;
   return Object.assign({}, st, {
     postImage: st.showPost ? post : null,
     bgImage: background || null,
@@ -2797,9 +2797,9 @@ function renderStoryEditor() {
     toggle("showPost", "Ditampilkan", "Disembunyikan")
   ), "Saat disembunyikan, kartu postingan tidak muncul di preview maupun hasil download."));
   g1.appendChild(labeled("Sumber gambar latar", toggleRow(
-    toggle("bgSame", "Sama dengan postingan", "Pakai gambar sendiri", true)
-  ), "Pakai gambar sendiri agar latar tidak menggunakan slide hasil generate."));
-  if (!st.bgSame) {
+    toggle("useGlobalBg", "Gambar global", "Pakai gambar sendiri", true)
+  ), "Gambar global adalah latar mentah yang dipakai carousel, bukan PNG slide hasil generate."));
+  if (st.useGlobalBg === false) {
     g1.appendChild(labeled("Upload gambar latar", buildImageDropzone(st, "bgImage", () => storyChanged(true), "JPG/PNG — dipakai sebagai latar blur")));
   }
 

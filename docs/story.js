@@ -241,19 +241,15 @@
       inner.appendChild(sub);
     }
 
-    /* The post card is optional; background-only Stories export without it. */
-    if (d.showPost === true) {
-      var card = el("div", "st-card" + (d.cardFrame === false ? " bare" : ""));
-      applyDebugTransform(card, d, "debugCard", "rotate(" + (d.cardRotate || 0) + "deg) scale(" + ((d.cardScale || 100) / 100) + ")");
-      if (d.postImage) {
-        var pi = document.createElement("img");
-        pi.className = "st-card-img"; pi.src = d.postImage;
-        card.appendChild(pi);
-      } else {
-        card.appendChild(el("div", "st-card-empty", "Pilih gambar postingan di bagian 1"));
-      }
-      inner.appendChild(card);
+    /* Keep the card slot in the layout; only its generated post image is optional. */
+    var card = el("div", "st-card" + (d.cardFrame === false ? " bare" : ""));
+    applyDebugTransform(card, d, "debugCard", "rotate(" + (d.cardRotate || 0) + "deg) scale(" + ((d.cardScale || 100) / 100) + ")");
+    if (d.showPost === true && d.postImage) {
+      var pi = document.createElement("img");
+      pi.className = "st-card-img"; pi.src = d.postImage;
+      card.appendChild(pi);
     }
+    inner.appendChild(card);
 
     /* Footer CTA: hooked arrow + two-line call to action + link chip */
     var cta = el("div", "st-cta");
